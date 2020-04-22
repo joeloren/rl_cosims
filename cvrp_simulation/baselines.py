@@ -1,14 +1,13 @@
 import numpy as np
 from ortools.constraint_solver import pywrapcp
 
-from cvrp_simulation.gym_wrapper import CVRPGymWrapper
 from cvrp_simulation.simulator import CVRPSimulation
 
 
 def ortools_policy(obs, env, precision=1000, timelimit=10, verbose=False):
     # there are always number of customers + 2 nodes: all customer nodes, plus a current position and
     # a depot position. The latter two can correspond to the same position, but do not need to.
-    num_customers = env.simulator.get_available_customers().size
+    num_customers = env.get_available_customers().size
     num_nodes = int(num_customers + 2)
     # args are (number of nodes, number of vehicles, index of start node, index of depot node)
     manager = pywrapcp.RoutingIndexManager(num_nodes, 1, [1], [0])
@@ -81,7 +80,7 @@ def ortools_policy(obs, env, precision=1000, timelimit=10, verbose=False):
 
 if __name__ == '__main__':
     customer_positions = np.array([[1, 1], [1, 0], [0, 1]])
-    sim = CVRPGymWrapper(CVRPSimulation(
+    sim = CVRPSimulation(
         depot_position=np.array([0, 0]),
         initial_vehicle_position=np.array([0, 0]),
         initial_vehicle_capacity=30,
@@ -91,7 +90,7 @@ if __name__ == '__main__':
         customer_times=np.array([0, 0, 0]),
         customer_ids=np.arange(0, 3),
         customer_visited=np.zeros([3]).astype(np.bool)
-    ))
+    )
     obs = sim.reset()
     done = False
     total_reward = 0
@@ -101,7 +100,7 @@ if __name__ == '__main__':
         act = np.random.choice(int(np.sum(obs["action_mask"])), p=action_probs)
         customer_chosen = sim.get_customer_index(act)
         obs, reward, done, info = sim.step(act)
-        print(f"i:{i}, t:{np.round(sim.simulator.current_time, 2)}, customer chosen:{customer_chosen}, reward {reward}, done {done}")
+        print(f"i:{i}, t:{np.round(sim.current_time, 2)}, customer chosen:{customer_chosen}, reward {reward}, done {done}")
         total_reward += reward
         i += 1
     print(total_reward)

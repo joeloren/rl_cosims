@@ -1,5 +1,6 @@
 from copy import deepcopy
 from dataclasses import dataclass
+from gym import Env, spaces
 
 import numpy as np
 
@@ -18,8 +19,9 @@ class State:
     # (True=vehicle visited the customer)
 
 
-class CVRPSimulation:
+class CVRPSimulation(Env):
     EPSILON_TIME = 1e-6
+    metadata = {"render.modes": ["human"]}
 
     def __init__(self,
                  depot_position: np.array,
@@ -34,6 +36,7 @@ class CVRPSimulation:
         """
         Create a new cvrp_simulation. Note that you need to call reset() before starting cvrp_simulation.
         """
+        super().__init__()
         self.initial_state = State(
             depot_position=depot_position,
             current_vehicle_position=initial_vehicle_position,
@@ -48,19 +51,51 @@ class CVRPSimulation:
 
         self.current_state = None
         self.current_time = 0
+        self.max_customers = self.initial_state.customer_visited.size
+        # create objects for gym environment
+        self.action_space = spaces.Discrete(self.max_customers + 1)
+        # observations are:
+        # - customer_positions: np.array  # [N, 2] float
+        # - customer_demands: np.array  # [N] int
+        # - action_mask: np.array  # [N+1] depot is the last index
+        # - depot_position: np.array  # x,y
+        # - current_vehicle_position: np.array  # x,y
+        # - current_vehicle_capacity: int
+        obs_spaces = {
+            "customer_positions": spaces.Box(
+                low=0, high=1,
+                shape=(self.max_customers, 2), dtype=np.float32),
+            "customer_demands": spaces.Box(
+                low=1, high=10,
+                shape=(self.max_customers,), dtype=np.int32),
+            "action_mask": spaces.MultiBinary(self.max_customers + 1),
+            "depot_position": spaces.Box(
+                low=0, high=1,
+                shape=(2,), dtype=np.float32),
+            "current_vehicle_position": spaces.Box(
+                low=0, high=1,
+                shape=(2,), dtype=np.float32),
+            "current_vehicle_capacity": spaces.Discrete(
+                n=self.max_customers * 10
+            )
+        }
+        self.observation_space = spaces.Dict(obs_spaces)
         # TODO understand if these are needed
         self.jobs_completed_since_last_step = []
         self.current_state_value = 0.0
 
-    def reset(self) -> None:
+    def reset(self) -> dict:
         self.current_state = deepcopy(self.initial_state)
         self.current_time = 0
+        return self.current_state_to_observation()
 
-    def set_random_seed(self, seed: int) -> None:
+    # TODO implement a generator for the reset to get a different state when resetting the environment
+    def seed(self, seed=None) -> None:
         raise NotImplementedError
 
-    # todo: do we need to define a deepcopy function or does deepcopy work as-is?
-    def step(self, customer_index) -> (float, bool):
+    def step(self, action_chosen) -> (float, bool):
+        # get the customer chosen based on the action chosen
+        customer_index = self.get_customer_index(action_chosen)
         # todo: implement dynamic arrivals
         if customer_index is None:
             # returning to depot
@@ -86,7 +121,53 @@ class CVRPSimulation:
         is_done = self.calculate_is_complete()
         # current cvrp_simulation time is the travel time * vehicle velocity
         self.current_time += traveled_distance * self.current_state.vehicle_velocity
-        return -traveled_distance, is_done
+        # in the future might want to make a more sophisticated reward for the dynamic problem
+        reward = -traveled_distance
+        return self.current_state_to_observation(), reward, is_done, {}
+
+    def render(self, mode="human", close=False) -> None:
+        super(CVRPSimulation, self).render(mode=mode)
+        # TODO : add scatter plot of CVRP problem and create render object
+
+    def current_state_to_observation(self) -> dict:
+        available_customers_ids = self.get_available_customers()
+        num_available_customers = available_customers_ids.size
+        customer_positions = np.zeros(self.observation_space.spaces["customer_positions"].shape, dtype=np.float32)
+        customer_positions[:num_available_customers, :] = \
+            self.current_state.customer_positions[available_customers_ids]
+        customer_demands = np.zeros(self.observation_space.spaces["customer_demands"].shape, dtype=np.int8)
+        customer_demands[:num_available_customers] = \
+            self.current_state.customer_demands[available_customers_ids]
+        action_mask = np.zeros(self.observation_space.spaces["action_mask"].shape, dtype=np.float32)
+        # make available actions as the number of available customers + depot
+        action_mask[:num_available_customers+1] = 1
+        depot_position = np.copy(self.current_state.depot_position)
+        current_vehicle_position = np.copy(self.current_state.current_vehicle_position)
+        current_vehicle_capacity = self.current_state.current_vehicle_capacity
+        return {
+            "customer_positions": customer_positions,
+            "customer_demands": customer_demands,
+            "action_mask": action_mask,
+            "depot_position": depot_position,
+            "current_vehicle_position": current_vehicle_position,
+            "current_vehicle_capacity": current_vehicle_capacity,
+        }
+
+    def get_customer_index(self, action_index: int) -> int:
+        """
+        this function gets the customer index based on chosen index and masked customers
+        :param action_index: this is the index chosen by the policy [0, 1,... n_available_customers +1]
+        :return: customer index (same as customer id)
+        """
+        available_customers_ids = self.get_available_customers()
+        num_possible_actions = available_customers_ids.size + 1
+        if action_index > num_possible_actions:
+            raise ValueError(f"action chosen is: {action_index} and there are only :{num_possible_actions} actions")
+        if action_index == num_possible_actions:
+            customer_index = None  # depot is chosen
+        else:
+            customer_index = available_customers_ids[action_index]  # find customer from id (index in real customer matrices)
+        return customer_index
 
     def get_available_customers(self) -> np.ndarray:
         """
@@ -110,7 +191,4 @@ class CVRPSimulation:
         this function returns True if all customers have been visited and False otherwise
         :return: bool
         """
-        if self.current_state.customer_visited.all():
-            return True
-        else:
-            return False
+        return self.current_state.customer_visited.all()
