@@ -1,0 +1,194 @@
+from copy import deepcopy
+from dataclasses import dataclass
+from gym import Env, spaces
+
+import numpy as np
+
+
+@dataclass
+class State:
+    depot_position: np.ndarray  # x,y
+    current_vehicle_position: np.ndarray  # x,y
+    current_vehicle_capacity: int
+    vehicle_velocity: int  # this is needed in order to calculate time
+    customer_positions: np.ndarray  # [N, 2] float
+    customer_demands: np.ndarray  # [N] int
+    customer_times: np.ndarray  # [N] int (in the future might be a [N, 2] array if events will also have a end time
+    customer_ids: np.ndarray  # [N]  this is used in order to go from action chosen to customer chosen
+    customer_visited: np.ndarray  # [N] bool this vector is used to know if customer has been visited or not
+    # (True=vehicle visited the customer)
+
+
+class CVRPSimulation(Env):
+    EPSILON_TIME = 1e-6
+    metadata = {"render.modes": ["human"]}
+
+    def __init__(self,
+                 depot_position: np.array,
+                 initial_vehicle_position: np.array,
+                 initial_vehicle_capacity: int,
+                 vehicle_velocity: int,
+                 customer_positions: np.array,
+                 customer_demands: np.array,
+                 customer_times: np.ndarray,
+                 customer_ids: np.ndarray,
+                 customer_visited: np.ndarray) -> None:
+        """
+        Create a new cvrp_simulation. Note that you need to call reset() before starting cvrp_simulation.
+        """
+        super().__init__()
+        self.initial_state = State(
+            depot_position=depot_position,
+            current_vehicle_position=initial_vehicle_position,
+            current_vehicle_capacity=initial_vehicle_capacity,
+            vehicle_velocity=vehicle_velocity,
+            customer_positions=customer_positions,
+            customer_demands=customer_demands,
+            customer_times=customer_times,
+            customer_ids=customer_ids,
+            customer_visited=customer_visited
+        )
+
+        self.current_state = None
+        self.current_time = 0
+        self.max_customers = self.initial_state.customer_visited.size
+        # create objects for gym environment
+        self.action_space = spaces.Discrete(self.max_customers + 1)
+        # observations are:
+        # - customer_positions: np.array  # [N, 2] float
+        # - customer_demands: np.array  # [N] int
+        # - action_mask: np.array  # [N+1] depot is the last index
+        # - depot_position: np.array  # x,y
+        # - current_vehicle_position: np.array  # x,y
+        # - current_vehicle_capacity: int
+        obs_spaces = {
+            "customer_positions": spaces.Box(
+                low=0, high=1,
+                shape=(self.max_customers, 2), dtype=np.float32),
+            "customer_demands": spaces.Box(
+                low=1, high=10,
+                shape=(self.max_customers,), dtype=np.int32),
+            "action_mask": spaces.MultiBinary(self.max_customers + 1),
+            "depot_position": spaces.Box(
+                low=0, high=1,
+                shape=(2,), dtype=np.float32),
+            "current_vehicle_position": spaces.Box(
+                low=0, high=1,
+                shape=(2,), dtype=np.float32),
+            "current_vehicle_capacity": spaces.Discrete(
+                n=self.max_customers * 10
+            )
+        }
+        self.observation_space = spaces.Dict(obs_spaces)
+        # TODO understand if these are needed
+        self.jobs_completed_since_last_step = []
+        self.current_state_value = 0.0
+
+    def reset(self) -> dict:
+        self.current_state = deepcopy(self.initial_state)
+        self.current_time = 0
+        return self.current_state_to_observation()
+
+    # TODO implement a generator for the reset to get a different state when resetting the environment
+    def seed(self, seed=None) -> None:
+        raise NotImplementedError
+
+    def step(self, action_chosen) -> (float, bool):
+        # get the customer chosen based on the action chosen
+        customer_index = self.get_customer_index(action_chosen)
+        # todo: implement dynamic arrivals
+        if customer_index is None:
+            # returning to depot
+            depot_position = self.current_state.depot_position
+            traveled_distance = np.linalg.norm(depot_position - self.current_state.current_vehicle_position)
+            self.current_state.current_vehicle_position = depot_position
+            self.current_state.current_vehicle_capacity = self.initial_state.current_vehicle_capacity
+        else:
+            # going to a customer
+            if self.current_state.customer_visited[customer_index]:
+                raise ValueError("cannot revisit the same customer more than once")
+            customer_position = self.current_state.customer_positions[customer_index, :]
+            customer_demand = self.current_state.customer_demands[customer_index]
+            self.current_state.customer_visited[customer_index] = True
+            if customer_demand > self.current_state.current_vehicle_capacity:
+                raise ValueError(
+                    f"going to customer {customer_index} with demand {customer_demand}"
+                    f"exceeds the remaining vehicle capacity ({self.current_state.current_vehicle_capacity})")
+            traveled_distance = np.linalg.norm(customer_position - self.current_state.current_vehicle_position)
+            self.current_state.current_vehicle_position = customer_position
+            self.current_state.current_vehicle_capacity -= customer_demand
+        # find if the cvrp_simulation is over
+        is_done = self.calculate_is_complete()
+        # current cvrp_simulation time is the travel time * vehicle velocity
+        self.current_time += traveled_distance * self.current_state.vehicle_velocity
+        # in the future might want to make a more sophisticated reward for the dynamic problem
+        reward = -traveled_distance
+        return self.current_state_to_observation(), reward, is_done, {}
+
+    def render(self, mode="human", close=False) -> None:
+        super(CVRPSimulation, self).render(mode=mode)
+        # TODO : add scatter plot of CVRP problem and create render object
+
+    def current_state_to_observation(self) -> dict:
+        available_customers_ids = self.get_available_customers()
+        num_available_customers = available_customers_ids.size
+        customer_positions = np.zeros(self.observation_space.spaces["customer_positions"].shape, dtype=np.float32)
+        customer_positions[:num_available_customers, :] = \
+            self.current_state.customer_positions[available_customers_ids]
+        customer_demands = np.zeros(self.observation_space.spaces["customer_demands"].shape, dtype=np.int8)
+        customer_demands[:num_available_customers] = \
+            self.current_state.customer_demands[available_customers_ids]
+        action_mask = np.zeros(self.observation_space.spaces["action_mask"].shape, dtype=np.float32)
+        # make available actions as the number of available customers + depot
+        action_mask[:num_available_customers+1] = 1
+        depot_position = np.copy(self.current_state.depot_position)
+        current_vehicle_position = np.copy(self.current_state.current_vehicle_position)
+        current_vehicle_capacity = self.current_state.current_vehicle_capacity
+        return {
+            "customer_positions": customer_positions,
+            "customer_demands": customer_demands,
+            "action_mask": action_mask,
+            "depot_position": depot_position,
+            "current_vehicle_position": current_vehicle_position,
+            "current_vehicle_capacity": current_vehicle_capacity,
+        }
+
+    def get_customer_index(self, action_index: int) -> int:
+        """
+        this function gets the customer index based on chosen index and masked customers
+        :param action_index: this is the index chosen by the policy [0, 1,... n_available_customers +1]
+        :return: customer index (same as customer id)
+        """
+        available_customers_ids = self.get_available_customers()
+        num_possible_actions = available_customers_ids.size + 1
+        if action_index > num_possible_actions:
+            raise ValueError(f"action chosen is: {action_index} and there are only :{num_possible_actions} actions")
+        if action_index == num_possible_actions:
+            customer_index = None  # depot is chosen
+        else:
+            customer_index = available_customers_ids[action_index]  # find customer from id (index in real customer matrices)
+        return customer_index
+
+    def get_available_customers(self) -> np.ndarray:
+        """
+        this function returns the ids of the available customers
+        :return: np.ndarray of available customer id's, length of array is the number of available customers
+        """
+        # returns only customers that are:
+        # 1. opened (start_time <= sim_current_time)
+        # 2. not visited
+        # 3. demand is smaller or equal to the vehicle capacity
+        demand_time = np.logical_and(self.current_state.customer_times <= self.current_time,
+                                     self.current_state.customer_demands <= self.current_state.current_vehicle_capacity)
+        demand_time_visited = np.logical_and(demand_time,
+                                             np.logical_not(self.current_state.customer_visited))
+        # TODO: figure out what happens when there are no available customers
+        available_customer_ids = self.current_state.customer_ids[demand_time_visited]
+        return available_customer_ids
+
+    def calculate_is_complete(self) -> bool:
+        """
+        this function returns True if all customers have been visited and False otherwise
+        :return: bool
+        """
+        return self.current_state.customer_visited.all()
