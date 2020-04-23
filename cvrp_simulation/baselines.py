@@ -5,6 +5,7 @@ from cvrp_simulation.simulator import CVRPSimulation
 from cvrp_simulation.scenario_generator import SpecificSample
 
 
+
 def ortools_policy(obs, env, precision=1000, timelimit=10, verbose=False):
     # there are always number of customers + 2 nodes: all customer nodes, plus a current position and
     # a depot position. The latter two can correspond to the same position, but do not need to.

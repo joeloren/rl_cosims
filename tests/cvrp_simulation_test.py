@@ -5,6 +5,7 @@ from cvrp_simulation.simulator import CVRPSimulation
 from cvrp_simulation.scenario_generator import SpecificSample, SampleStaticBenchmark
 
 
+
 def test_intermediate_states_match_hand_calculated_values():
     customer_positions = np.array([[1, 0], [1, 1], [0, 1]])
     depot_position = np.array([0, 0])
@@ -16,6 +17,7 @@ def test_intermediate_states_match_hand_calculated_values():
     problem_generator = SpecificSample(depot_position, initial_vehicle_position, initial_vehicle_capacity,
                                        vehicle_velocity, customer_positions, customer_demands, customer_times)
     sim = CVRPSimulation(max_customers=3, problem_generator=problem_generator)
+
     sim.reset()
     reward, done = sim.step(0)
     assert reward == -1
@@ -56,9 +58,9 @@ def test_bounds_exceeded():
     problem_generator = SpecificSample(depot_position, initial_vehicle_position, initial_vehicle_capacity,
                                        vehicle_velocity, customer_positions, customer_demands, customer_times)
     sim = CVRPSimulation(max_customers=3, problem_generator=problem_generator)
+
     sim.reset()
     with pytest.raises(ValueError):
         sim.step(3)
-
 
 

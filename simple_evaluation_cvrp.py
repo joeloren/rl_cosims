@@ -5,6 +5,7 @@ from cvrp_simulation.simulator import CVRPSimulation
 from cvrp_simulation.scenario_generator import SpecificSample, SampleStaticBenchmark
 
 
+
 def main():
     # check cvrp_simulation and state -
     customer_positions = np.array([[1, 0], [1, 1], [0, 1]])
@@ -17,6 +18,7 @@ def main():
     problem_generator = SpecificSample(depot_position, initial_vehicle_position, initial_vehicle_capacity,
                                        vehicle_velocity, customer_positions, customer_demands, customer_times)
     sim = CVRPSimulation(max_customers=3, problem_generator=problem_generator)
+
     print("--------------------------------------")
     print("simulation testing:")
     obs = sim.reset()
