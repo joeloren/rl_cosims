@@ -2,6 +2,7 @@ import numpy as np
 from ortools.constraint_solver import pywrapcp
 
 from cvrp_simulation.simulator import CVRPSimulation
+from cvrp_simulation.scenario_generator import SpecificSample
 
 
 def ortools_policy(obs, env, precision=1000, timelimit=10, verbose=False):
@@ -79,18 +80,16 @@ def ortools_policy(obs, env, precision=1000, timelimit=10, verbose=False):
 
 
 if __name__ == '__main__':
-    customer_positions = np.array([[1, 1], [1, 0], [0, 1]])
-    sim = CVRPSimulation(
-        depot_position=np.array([0, 0]),
-        initial_vehicle_position=np.array([0, 0]),
-        initial_vehicle_capacity=30,
-        vehicle_velocity=10,
-        customer_positions=customer_positions,
-        customer_demands=np.array([5, 5, 5]),
-        customer_times=np.array([0, 0, 0]),
-        customer_ids=np.arange(0, 3),
-        customer_visited=np.zeros([3]).astype(np.bool)
-    )
+    customer_positions = np.array([[1, 0], [1, 1], [0, 1]])
+    depot_position = np.array([0, 0])
+    initial_vehicle_position = np.array([0, 0])
+    initial_vehicle_capacity = 30
+    vehicle_velocity = 10
+    customer_demands = np.array([5, 5, 5])
+    customer_times = np.array([0, 0, 0])
+    problem_generator = SpecificSample(depot_position, initial_vehicle_position, initial_vehicle_capacity,
+                                       vehicle_velocity, customer_positions, customer_demands, customer_times)
+    sim = CVRPSimulation(max_customers=3, problem_generator=problem_generator)
     obs = sim.reset()
     done = False
     total_reward = 0
