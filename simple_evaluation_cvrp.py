@@ -5,7 +5,6 @@ from cvrp_simulation.simulator import CVRPSimulation
 from cvrp_simulation.scenario_generator import SpecificSample, SampleStaticBenchmark
 
 
-
 def main():
     # check cvrp_simulation and state -
     customer_positions = np.array([[1, 0], [1, 1], [0, 1]])
@@ -43,7 +42,7 @@ def main():
     customer_positions_rv = stats.uniform(loc=0, scale=1)
     customer_demands_rv = stats.uniform(loc=0, scale=10)
     vrp_size = 20
-    initial_vehicle_capacity = 20
+    initial_vehicle_capacity = 10*vrp_size
     benchmark_generator = SampleStaticBenchmark(
         depot_position_rv=depot_position_rv,
         vehicle_position_rv=vehicle_position_rv,
@@ -57,7 +56,7 @@ def main():
     rand_reward = np.zeros(num_runs)
     print("--------------------------------------")
     print("benchmark simulation testing:")
-    sim = CVRPSimulation(max_customers=3, problem_generator=benchmark_generator)
+    sim = CVRPSimulation(max_customers=vrp_size, problem_generator=benchmark_generator)
     sim.seed(seed)
     for i in range(num_runs):
         obs = sim.reset()

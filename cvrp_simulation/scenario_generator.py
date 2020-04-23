@@ -67,13 +67,13 @@ class SpecificSample(ScenarioGenerator):
     this class creates a generator for the cvrp problem which always produces the same problem
     (used mainly for debugging)
     """
-    def __init__(self, depot_position: np.ndarry,
-                 vehicle_position: np.ndarry,
+    def __init__(self, depot_position: np.ndarray,
+                 vehicle_position: np.ndarray,
                  vehicle_capacity: int,
                  vehicle_velocity: int,
-                 customer_positions: np.ndarry,
-                 customer_demands: np.ndarry,
-                 customer_times: np.ndarry) -> None:
+                 customer_positions: np.ndarray,
+                 customer_demands: np.ndarray,
+                 customer_times: np.ndarray) -> None:
         super().__init__()
         self.depot_position = depot_position
         self.vehicle_position = vehicle_position
