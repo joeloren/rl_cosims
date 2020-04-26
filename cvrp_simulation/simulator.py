@@ -26,7 +26,7 @@ class CVRPSimulation(Env):
     EPSILON_TIME = 1e-6
     metadata = {"render.modes": ["human"]}
 
-    def __init__(self, max_customers: int, problem_generator: ScenarioGenerator) -> None:
+    def __init__(self, max_customers: int, problem_generator) -> None:
         """
         Create a new cvrp_simulation. Note that you need to call reset() before starting cvrp_simulation.
         :param max_customers: maximum number of customers in problem (graph size) [int]
