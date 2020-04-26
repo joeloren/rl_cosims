@@ -4,8 +4,6 @@ from gym import Env, spaces
 
 import numpy as np
 
-from cvrp_simulation.scenario_generator import ScenarioGenerator
-
 @dataclass
 class State:
     """
