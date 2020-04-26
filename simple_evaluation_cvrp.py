@@ -2,7 +2,7 @@ import numpy as np
 from scipy import stats
 
 from cvrp_simulation.simulator import CVRPSimulation
-from cvrp_simulation.scenario_generator import SpecificSample, SampleStaticBenchmark
+from cvrp_simulation.scenario_generator import FixedSample, SampleStaticBenchmark
 
 
 def main():
@@ -14,8 +14,8 @@ def main():
     vehicle_velocity = 10
     customer_demands = np.array([5, 5, 5])
     customer_times = np.array([0, 0, 0])
-    problem_generator = SpecificSample(depot_position, initial_vehicle_position, initial_vehicle_capacity,
-                                       vehicle_velocity, customer_positions, customer_demands, customer_times)
+    problem_generator = FixedSample(depot_position, initial_vehicle_position, initial_vehicle_capacity,
+                                    vehicle_velocity, customer_positions, customer_demands, customer_times)
     sim = CVRPSimulation(max_customers=3, problem_generator=problem_generator)
 
     print("--------------------------------------")
