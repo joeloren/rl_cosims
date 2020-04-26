@@ -4,9 +4,14 @@ from gym import Env, spaces
 
 import numpy as np
 
+from cvrp_simulation.scenario_generator import ScenarioGenerator
 
 @dataclass
 class State:
+    """
+    this class defines the simulation state at every time step. this state describes the total environment (including
+    customers that are not known to the agent)
+    """
     depot_position: np.ndarray  # x,y
     current_vehicle_position: np.ndarray  # x,y
     current_vehicle_capacity: int
@@ -23,35 +28,20 @@ class CVRPSimulation(Env):
     EPSILON_TIME = 1e-6
     metadata = {"render.modes": ["human"]}
 
-    def __init__(self,
-                 depot_position: np.array,
-                 initial_vehicle_position: np.array,
-                 initial_vehicle_capacity: int,
-                 vehicle_velocity: int,
-                 customer_positions: np.array,
-                 customer_demands: np.array,
-                 customer_times: np.ndarray,
-                 customer_ids: np.ndarray,
-                 customer_visited: np.ndarray) -> None:
+    def __init__(self, max_customers: int, problem_generator: ScenarioGenerator) -> None:
         """
         Create a new cvrp_simulation. Note that you need to call reset() before starting cvrp_simulation.
+        :param max_customers: maximum number of customers in problem (graph size) [int]
+        :param problem_generator: a generator of type ScenarioGenerator which generates one instance of the cvrp problem
+        and returns the initial state of the problem
+
         """
         super().__init__()
-        self.initial_state = State(
-            depot_position=depot_position,
-            current_vehicle_position=initial_vehicle_position,
-            current_vehicle_capacity=initial_vehicle_capacity,
-            vehicle_velocity=vehicle_velocity,
-            customer_positions=customer_positions,
-            customer_demands=customer_demands,
-            customer_times=customer_times,
-            customer_ids=customer_ids,
-            customer_visited=customer_visited
-        )
-
-        self.current_state = None
-        self.current_time = 0
-        self.max_customers = self.initial_state.customer_visited.size
+        self.initial_state = None  # will be defined in reset() method
+        self.current_state = None  # current state of the simulation, this is updated at every step() call
+        self.problem_generator = problem_generator  # during reset this will generate a new instance of state
+        self.current_time = 0  # a ticker which updates at the end of every step() to the next time step
+        self.max_customers = max_customers  # max number of customers in the problem (this is the max size of the graph)
         # create objects for gym environment
         self.action_space = spaces.Discrete(self.max_customers + 1)
         # observations are:
@@ -80,20 +70,31 @@ class CVRPSimulation(Env):
             )
         }
         self.observation_space = spaces.Dict(obs_spaces)
-        # TODO understand if these are needed
+        # TODO understand if these are needed and if so where they should be used and implemented
         self.jobs_completed_since_last_step = []
         self.current_state_value = 0.0
 
     def reset(self) -> dict:
+        self.initial_state = self.problem_generator.reset()
         self.current_state = deepcopy(self.initial_state)
         self.current_time = 0
         return self.current_state_to_observation()
 
-    # TODO implement a generator for the reset to get a different state when resetting the environment
     def seed(self, seed=None) -> None:
-        raise NotImplementedError
+        """
+        define seed in problem generator
+        :param seed: seed to be used [int]
+        :return:
+        """
+        self.problem_generator.seed(seed)
 
-    def step(self, action_chosen) -> (float, bool):
+    def step(self, action_chosen: int) -> (float, bool):
+        """
+        this function updates the state and observation based on the action chosen by agent.
+        the action is first translated to customer index and then state is updated in place
+        :param action_chosen: index of action chosen from all options
+        :return: the function returns the new observation [dict], reward [float] and if the simulation is done [bool]
+        """
         # get the customer chosen based on the action chosen
         customer_index = self.get_customer_index(action_chosen)
         # todo: implement dynamic arrivals
@@ -107,6 +108,7 @@ class CVRPSimulation(Env):
             # going to a customer
             if self.current_state.customer_visited[customer_index]:
                 raise ValueError("cannot revisit the same customer more than once")
+            # updating vehicle position and current capacity
             customer_position = self.current_state.customer_positions[customer_index, :]
             customer_demand = self.current_state.customer_demands[customer_index]
             self.current_state.customer_visited[customer_index] = True
@@ -126,12 +128,26 @@ class CVRPSimulation(Env):
         return self.current_state_to_observation(), reward, is_done, {}
 
     def render(self, mode="human", close=False) -> None:
+        """
+        this function is needed for gym environment. for now doesn't do anything. in the future should create a scatter
+        plot of the current state (vehicle and customer locations)
+        :param mode:
+        :param close:
+        :return:
+        """
         super(CVRPSimulation, self).render(mode=mode)
         # TODO : add scatter plot of CVRP problem and create render object
 
     def current_state_to_observation(self) -> dict:
+        """
+        this function creates the observation for the agent based on the current state.
+        the agent knows only the opened customers (i.e. customers who's start time >= current time)
+        :return: current observation [dict]
+        """
+        # TODO: figure out if the observation needs to always be the same length. if not no need for zero padding
         available_customers_ids = self.get_available_customers()
         num_available_customers = available_customers_ids.size
+        # creating current vectors of vehicles position and capacity
         customer_positions = np.zeros(self.observation_space.spaces["customer_positions"].shape, dtype=np.float32)
         customer_positions[:num_available_customers, :] = \
             self.current_state.customer_positions[available_customers_ids]
