@@ -96,7 +96,10 @@ class CVRPSimulation(Env):
         # get the customer chosen based on the action chosen
         customer_index = self.get_customer_index(action_chosen)
         # todo: implement dynamic arrivals
-        if customer_index is None:
+        if customer_index == -1:
+            self.current_state = deepcopy(self.current_state)
+            traveled_distance = 0
+        elif customer_index is None:
             # returning to depot
             depot_position = self.current_state.depot_position
             traveled_distance = np.linalg.norm(depot_position - self.current_state.current_vehicle_position)
@@ -174,14 +177,18 @@ class CVRPSimulation(Env):
         :return: customer index (same as customer id)
         """
         available_customers_ids = self.get_available_customers()
-        num_possible_actions = available_customers_ids.size + 1
-        if action_index > num_possible_actions:
-            raise ValueError(f"action chosen is: {action_index} and there are only :{num_possible_actions} actions")
-        if action_index == num_possible_actions:
-            customer_index = None  # depot is chosen
+        if available_customers_ids.size>0:
+            num_possible_actions = available_customers_ids.size + 1
+            if action_index > num_possible_actions:
+                raise ValueError(f"action chosen is: {action_index} and there are only :{num_possible_actions} actions")
+            if action_index == num_possible_actions:
+                customer_index = None  # depot is chosen
+            else:
+                customer_index = available_customers_ids[action_index]  # find customer from id (index in real customer matrices)
+            return customer_index
         else:
-            customer_index = available_customers_ids[action_index]  # find customer from id (index in real customer matrices)
-        return customer_index
+            # this is what happens when there are no customers available, simulation will continue to next time step
+            return -1
 
     def get_available_customers(self) -> np.ndarray:
         """
