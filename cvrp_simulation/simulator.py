@@ -190,7 +190,7 @@ class CVRPSimulation(Env):
             # this is what happens when there are no customers available, simulation will continue to next time step
             customer_index = None  # depot is chosen
         return customer_index
-        
+
     def get_available_customers(self) -> np.ndarray:
         """
         this function returns the ids of the available customers
