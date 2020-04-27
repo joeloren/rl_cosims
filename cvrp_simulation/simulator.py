@@ -46,7 +46,8 @@ class CVRPSimulation(Env):
         # observations are:
         # - customer_positions: np.array  # [N, 2] float
         # - customer_demands: np.array  # [N] int
-        # - action_mask: np.array  # [N+1] depot is the last index
+        # - action_mask: np.array  # [N+2] depot is N+1 index, noop is N+2 index
+        # action_mask is True/False depending if action is possible (True) or not (False)
         # - depot_position: np.array  # x,y
         # - current_vehicle_position: np.array  # x,y
         # - current_vehicle_capacity: int
@@ -244,7 +245,7 @@ class CVRPSimulation(Env):
             masked_options[-1] = False
         return masked_options
 
-    def get_next_time(self):
+    def get_next_time(self) -> int:
         """
         this function finds the next time based on the next customer available (used when noop is chosen)
         :return:
