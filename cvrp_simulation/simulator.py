@@ -26,7 +26,7 @@ class CVRPSimulation(Env):
     EPSILON_TIME = 1e-6
     metadata = {"render.modes": ["human"]}
 
-    def __init__(self, max_customers: int, problem_generator) -> None:
+    def __init__(self, max_customers: int, problem_generator, allow_noop=True) -> None:
         """
         Create a new cvrp_simulation. Note that you need to call reset() before starting cvrp_simulation.
         :param max_customers: maximum number of customers in problem (graph size) [int]
@@ -40,6 +40,7 @@ class CVRPSimulation(Env):
         self.problem_generator = problem_generator  # during reset this will generate a new instance of state
         self.current_time = 0  # a ticker which updates at the end of every step() to the next time step
         self.max_customers = max_customers  # max number of customers in the problem (this is the max size of the graph)
+        self.allow_noop = allow_noop  # if noop action is allowed in simulation
         # create objects for gym environment
         self.action_space = spaces.Discrete(self.max_customers + 1)
         # observations are:
@@ -95,34 +96,44 @@ class CVRPSimulation(Env):
         """
         # get the customer chosen based on the action chosen
         customer_index = self.get_customer_index(action_chosen)
-        # todo: implement dynamic arrivals
+        # noop is chosen
         if customer_index == -1:
+            # the vehicle does not move and the time is moved to the next time a customer is opened
             self.current_state = deepcopy(self.current_state)
             traveled_distance = 0
-        elif customer_index is None:
-            # returning to depot
+            next_time = self.get_next_time()  # based on next customer to be available
+            if next_time < self.current_time:
+                raise ValueError(f"new time:{next_time} must be larger than the current time:{self.current_time}")
+            self.current_time = next_time
+        # depot is chosen
+        elif customer_index == -2:
+            # the vehicle is moved to the depot and the capacity is updated to initial capacity
             depot_position = self.current_state.depot_position
             traveled_distance = np.linalg.norm(depot_position - self.current_state.current_vehicle_position)
             self.current_state.current_vehicle_position = depot_position
             self.current_state.current_vehicle_capacity = self.initial_state.current_vehicle_capacity
+        # customer is chosen
         else:
             # going to a customer
             if self.current_state.customer_visited[customer_index]:
-                raise ValueError("cannot revisit the same customer more than once")
-            # updating vehicle position and current capacity
+                raise ValueError(f"cannot revisit the same customer (id:{customer_index}) more than once")
+            # getting customer position and demand
             customer_position = self.current_state.customer_positions[customer_index, :]
             customer_demand = self.current_state.customer_demands[customer_index]
-            self.current_state.customer_visited[customer_index] = True
+            # checking if customer demand exceeds vehicle current capacity
             if customer_demand > self.current_state.current_vehicle_capacity:
                 raise ValueError(
                     f"going to customer {customer_index} with demand {customer_demand}"
                     f"exceeds the remaining vehicle capacity ({self.current_state.current_vehicle_capacity})")
             traveled_distance = np.linalg.norm(customer_position - self.current_state.current_vehicle_position)
+            # updating current state (vehicle capacity, position and customer visited state)
+            self.current_state.customer_visited[customer_index] = True
             self.current_state.current_vehicle_position = customer_position
             self.current_state.current_vehicle_capacity -= customer_demand
+
         # find if the cvrp_simulation is over
         is_done = self.calculate_is_complete()
-        # current cvrp_simulation time is the travel time * vehicle velocity
+        # next time is found based on: delta_time = travel_distance * vehicle_velocity  (t = v*x)
         self.current_time += traveled_distance * self.current_state.vehicle_velocity
         # in the future might want to make a more sophisticated reward for the dynamic problem
         reward = -traveled_distance
@@ -146,18 +157,11 @@ class CVRPSimulation(Env):
         :return: current observation [dict]
         """
         # TODO: figure out if the observation needs to always be the same length. if not no need for zero padding
-        available_customers_ids = self.get_available_customers()
-        num_available_customers = available_customers_ids.size
+        opened_customers_ids = self.get_opened_customers()
+        action_mask = self.get_masked_options(opened_customers_ids)  # return vector of customers , depot and noop masks
         # creating current vectors of vehicles position and capacity
-        customer_positions = np.zeros(self.observation_space.spaces["customer_positions"].shape, dtype=np.float32)
-        customer_positions[:num_available_customers, :] = \
-            self.current_state.customer_positions[available_customers_ids]
-        customer_demands = np.zeros(self.observation_space.spaces["customer_demands"].shape, dtype=np.int8)
-        customer_demands[:num_available_customers] = \
-            self.current_state.customer_demands[available_customers_ids]
-        action_mask = np.zeros(self.observation_space.spaces["action_mask"].shape, dtype=np.float32)
-        # make available actions as the number of available customers + depot
-        action_mask[:num_available_customers+1] = 1
+        customer_positions = deepcopy(self.current_state.customer_positions[opened_customers_ids])
+        customer_demands = deepcopy(self.current_state.customer_demands[opened_customers_ids])
         depot_position = np.copy(self.current_state.depot_position)
         current_vehicle_position = np.copy(self.current_state.current_vehicle_position)
         current_vehicle_capacity = self.current_state.current_vehicle_capacity
@@ -173,25 +177,43 @@ class CVRPSimulation(Env):
     def get_customer_index(self, action_index: int) -> int:
         """
         this function gets the customer index based on chosen index and masked customers
-        :param action_index: this is the index chosen by the policy [0, 1,... n_available_customers +1]
-        :return: customer index (same as customer id)
+        the actions order is: [c_0, c_1,... c_n, depot, noop] where c_i is the customer i that is opened
+        noop is an option only if allow_noop is True otherwise vector is [n_available_customers + 1] length
+        :param action_index: this is the index chosen by the policy [0, 1,... n_available_customers +2]
+        :return: customer index (same as customer id) or -1 for noop or -2 for depot
         """
-        available_customers_ids = self.get_available_customers()
-        if available_customers_ids.size > 0:
-            num_possible_actions = available_customers_ids.size + 1
+        opened_customers_ids = self.get_opened_customers()
+        if opened_customers_ids.size > 0:  # there are opened customers waiting for pickup
+            num_possible_actions = opened_customers_ids.size + 2  # all opened customers + depot + noop
             if action_index > num_possible_actions:
                 raise ValueError(f"action chosen is: {action_index} and there are only :{num_possible_actions} actions")
-            if action_index == num_possible_actions:
-                customer_index = None  # depot is chosen
+            #  noop chosen
+            if action_index == num_possible_actions - 1:
+                if not self.allow_noop:
+                    raise Exception("noop action chosen even though flag is False")
+                customer_index = -1  # noop is chosen
+            # depot chosen
+            elif action_index == num_possible_actions - 2:
+                customer_index = -2  # depot is chosen
+            # customer chosen
             else:
-                customer_index = available_customers_ids[action_index]  # find customer from id (index in real customer matrices)
-        else:
-            # TODO decide what happens when there are no cusotmers available. for now returning to depot
-            # this is what happens when there are no customers available, simulation will continue to next time step
-            customer_index = None  # depot is chosen
+                # find customer index based on masked customers
+                masked_options = self.get_masked_options(opened_customers_ids)
+                if masked_options[action_index]:
+                    customer_index = opened_customers_ids[action_index]  # find customer from id matrix
+                else:
+                    # the customer chosen is not available (action should have been masked)
+                    raise Exception(f"tried to move to customer that is not available , "
+                                    f"customer id:{opened_customers_ids[action_index]}")
+        else:  # there are no customers opened in the system that have not been picked up
+            # TODO decide what happens when there are no customers available. for now chooses noop
+            if self.allow_noop:
+                customer_index = -1  # noop is chosen
+            else:
+                customer_index = -2  # depot is chosen
         return customer_index
 
-    def get_available_customers(self) -> np.ndarray:
+    def get_opened_customers(self) -> np.ndarray:
         """
         this function returns the ids of the available customers
         :return: np.ndarray of available customer id's, length of array is the number of available customers
@@ -199,14 +221,41 @@ class CVRPSimulation(Env):
         # returns only customers that are:
         # 1. opened (start_time <= sim_current_time)
         # 2. not visited
-        # 3. demand is smaller or equal to the vehicle capacity
-        demand_time = np.logical_and(self.current_state.customer_times <= self.current_time,
-                                     self.current_state.customer_demands <= self.current_state.current_vehicle_capacity)
-        demand_time_visited = np.logical_and(demand_time,
-                                             np.logical_not(self.current_state.customer_visited))
+        time_visited = np.logical_and(self.current_state.customer_times <= self.current_time,
+                                      np.logical_not(self.current_state.customer_visited))
         # TODO: figure out what happens when there are no available customers
-        available_customer_ids = self.current_state.customer_ids[demand_time_visited]
-        return available_customer_ids
+        opened_customer_ids = self.current_state.customer_ids[time_visited]
+        return opened_customer_ids
+
+    def get_masked_options(self, opened_customers_ids: np.ndarray) -> np.ndarray:
+        """
+        this function masks the current action vector where customers exceed the current vehicle capacity
+        noop is True depending on flag and if there are customers still not opened and depot is always True
+        :param opened_customers_ids: vector of opened customers that have not been picked up yet
+        :return: masked_options - bool vector of masked options (True : option is available , False: not available)
+        """
+        opened_customer_demands = self.current_state.customer_demands[opened_customers_ids]
+        num_opened_customers = opened_customers_ids.size
+        masked_options = np.ones(num_opened_customers + 2).astype(np.bool)
+        masked_options[:-2] = (opened_customer_demands <= self.current_state.current_vehicle_capacity)
+        num_customers_not_opened = np.sum(self.current_state.customer_times > self.current_time)
+        if (not self.allow_noop) or (num_customers_not_opened == 0):
+            # noop is not allowed and therefore should be masked out
+            masked_options[-1] = False
+        return masked_options
+
+    def get_next_time(self):
+        """
+        this function finds the next time based on the next customer available (used when noop is chosen)
+        :return:
+        """
+        customer_times = self.current_state.customer_times
+        next_time = np.sort(customer_times[customer_times > self.current_time])
+        if next_time.size > 0:
+            return next_time[0]
+        else:
+            # TODO decide if the simulation should send an exception or something else should happen in this case
+            raise Exception(f"policy chose noop but there are no more customers that need to be opened")
 
     def calculate_is_complete(self) -> bool:
         """
