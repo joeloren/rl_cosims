@@ -177,7 +177,7 @@ class CVRPSimulation(Env):
         :return: customer index (same as customer id)
         """
         available_customers_ids = self.get_available_customers()
-        if available_customers_ids.size>0:
+        if available_customers_ids.size > 0:
             num_possible_actions = available_customers_ids.size + 1
             if action_index > num_possible_actions:
                 raise ValueError(f"action chosen is: {action_index} and there are only :{num_possible_actions} actions")
@@ -185,11 +185,12 @@ class CVRPSimulation(Env):
                 customer_index = None  # depot is chosen
             else:
                 customer_index = available_customers_ids[action_index]  # find customer from id (index in real customer matrices)
-            return customer_index
         else:
+            # TODO decide what happens when there are no cusotmers available. for now returning to depot
             # this is what happens when there are no customers available, simulation will continue to next time step
-            return -1
-
+            customer_index = None  # depot is chosen
+        return customer_index
+        
     def get_available_customers(self) -> np.ndarray:
         """
         this function returns the ids of the available customers
