@@ -1,9 +1,12 @@
 import numpy as np
 from ortools.constraint_solver import pywrapcp
+from ortools.constraint_solver import routing_enums_pb2
+from matplotlib import pyplot as plt
+from scipy import stats
 
 from cvrp_simulation.simulator import CVRPSimulation
-from cvrp_simulation.scenario_generator import FixedSample
-
+from cvrp_simulation.scenario_generator import FixedSample, SampleStaticBenchmark
+from plot_results import plot_vehicle_routes
 
 
 def ortools_policy(obs, env, precision=1000, timelimit=10, verbose=False):
@@ -37,10 +40,6 @@ def ortools_policy(obs, env, precision=1000, timelimit=10, verbose=False):
         return precision * distance
 
     transit_callback_index = routing.RegisterTransitCallback(distance_callback)
-
-    # Define cost of each arc.
-    routing.SetArcCostEvaluatorOfAllVehicles(transit_callback_index)
-
     # Add Distance constraint.
     dimension_name = 'Distance'
     routing.AddDimension(
@@ -52,7 +51,29 @@ def ortools_policy(obs, env, precision=1000, timelimit=10, verbose=False):
     distance_dimension = routing.GetDimensionOrDie(dimension_name)
     distance_dimension.SetGlobalSpanCostCoefficient(100)
 
+    # Define cost of each arc.
+    routing.SetArcCostEvaluatorOfAllVehicles(transit_callback_index)
+
+    # Add Capacity constraint.
+    def demand_callback(from_index):
+        """Returns the demand of the node."""
+        # Convert from routing variable Index to demands NodeIndex.
+        from_node = manager.IndexToNode(from_index)
+        return obs['customer_demands'][from_node]
+
+    demand_callback_index = routing.RegisterUnaryTransitCallback(
+        demand_callback)
+    routing.AddDimensionWithVehicleCapacity(
+        demand_callback_index,
+        0,  # null capacity slack
+        [obs['current_vehicle_capacity']],  # vehicle maximum capacities
+        True,  # start cumul to zero
+        'Capacity')
+
+    # Setting first solution heuristic.
     search_parameters = pywrapcp.DefaultRoutingSearchParameters()
+    search_parameters.first_solution_strategy = (
+        routing_enums_pb2.FirstSolutionStrategy.PATH_CHEAPEST_ARC)
     search_parameters.time_limit.seconds = timelimit
     solution = routing.SolveWithParameters(search_parameters)
 
@@ -81,26 +102,63 @@ def ortools_policy(obs, env, precision=1000, timelimit=10, verbose=False):
 
 
 if __name__ == '__main__':
-    customer_positions = np.array([[1, 0], [1, 1], [0, 1]])
-    depot_position = np.array([0, 0])
-    initial_vehicle_position = np.array([0, 0])
-    initial_vehicle_capacity = 30
-    vehicle_velocity = 10
-    customer_demands = np.array([5, 5, 5])
-    customer_times = np.array([0, 0, 0])
-    problem_generator = FixedSample(depot_position, initial_vehicle_position, initial_vehicle_capacity,
-                                    vehicle_velocity, customer_positions, customer_demands, customer_times)
-    sim = CVRPSimulation(max_customers=3, problem_generator=problem_generator)
+    fig1, ax1 = plt.subplots(1, 1)
+    problem_generator = None
+    run_benchmark = True
+    if run_benchmark:
+        # create random input based on benchmark distributions -
+        depot_position_rv = stats.uniform(loc=0, scale=1)
+        vehicle_position_rv = stats.uniform(loc=0, scale=1)
+        customer_positions_rv = stats.uniform(loc=0, scale=1)
+        customer_demands_rv = stats.randint(low=0, high=10)
+        vrp_size = 10
+        initial_vehicle_capacity = 50
+        problem_generator = SampleStaticBenchmark(
+            depot_position_rv=depot_position_rv,
+            vehicle_position_rv=vehicle_position_rv,
+            vehicle_capacity=initial_vehicle_capacity,
+            vehicle_velocity=10,
+            customer_positions_rv=customer_positions_rv,
+            customer_demands_rv=customer_demands_rv,
+            vrp_size=vrp_size)
+        seed = 50
+    else:
+        # run fixed problem for debugging
+        customer_positions = np.array([[1, 0], [1, 1], [0, 1]])
+        depot_position = np.array([0, 0])
+        initial_vehicle_position = np.array([0, 0])
+        initial_vehicle_capacity = 30
+        vehicle_velocity = 10
+        customer_demands = np.array([5, 5, 5])
+        customer_times = np.array([0, 0, 0])
+        vrp_size = 3
+        problem_generator = FixedSample(depot_position, initial_vehicle_position, initial_vehicle_capacity,
+                                        vehicle_velocity, customer_positions, customer_demands, customer_times)
+
+    sim = CVRPSimulation(max_customers=vrp_size, problem_generator=problem_generator)
     obs = sim.reset()
     done = False
     total_reward = 0
     i = 0
+    vehicle_route = {0:
+                         {'x': [sim.current_state.current_vehicle_position[0]],
+                          'y': [sim.current_state.current_vehicle_position[1]]}
+                     }
+    depot_position = sim.current_state.depot_position
+    customer_positions = sim.current_state.customer_positions
     while not done:
         action_probs = ortools_policy(obs, sim, verbose=True)
         act = np.random.choice(int(np.sum(obs["action_mask"])), p=action_probs)
         customer_chosen = sim.get_customer_index(act)
         obs, reward, done, info = sim.step(act)
-        print(f"i:{i}, t:{np.round(sim.current_time, 2)}, customer chosen:{customer_chosen}, reward {reward}, done {done}")
+        vehicle_pos = sim.current_state.current_vehicle_position
+        vehicle_route[0]['x'].append(vehicle_pos[0])
+        vehicle_route[0]['y'].append(vehicle_pos[1])
+        print(
+            f"i:{i}, t:{np.round(sim.current_time, 2)}, vehicle capacity:{sim.current_state.current_vehicle_capacity},"
+            f" customer chosen:{customer_chosen}, reward {reward}, done {done}")
         total_reward += reward
         i += 1
     print(total_reward)
+    plot_vehicle_routes(depot_position,customer_positions, vehicle_route, ax1)
+    plt.show()
