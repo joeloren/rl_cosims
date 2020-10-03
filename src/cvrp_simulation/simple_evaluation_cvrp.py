@@ -1,8 +1,8 @@
 import numpy as np
 from scipy import stats
 
-from cvrp_simulation.simulator import CVRPSimulation
-from cvrp_simulation.scenario_generator import FixedSample, SampleStaticBenchmark, SampleDynamicBenchmark
+from src.cvrp_simulation import CVRPSimulation
+from src.cvrp_simulation import FixedSample, SampleStaticBenchmark, SampleDynamicBenchmark
 
 
 def run_simple_test():
