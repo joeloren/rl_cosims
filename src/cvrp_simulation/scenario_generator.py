@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 import numpy as np
 from scipy import stats
 
-from cvrp_simulation.simulator import State
+from src.cvrp_simulation import State
 
 
 class ScenarioGenerator(ABC):
