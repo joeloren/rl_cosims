@@ -17,6 +17,7 @@ class ScenarioGenerator(ABC):
         """Resets the arrival process"""
         raise NotImplementedError
 
+
 # Generate random graph - in our case we care about adjacency list
 def generate_random_graph(number_of_nodes, probability_of_edge):
     """

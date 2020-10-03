@@ -34,9 +34,9 @@ class Simulator(Env):
         """
         super().__init__()
         # initial state is empty data variables if self.reset() is not called
-        self.initial_state :State = State(unique_colors= set(), graph=nx.Graph(), num_colored_nodes=0, node_order=[])
+        self.initial_state: State = State(unique_colors= set(), graph=nx.Graph(), num_colored_nodes=0, node_order=[])
         # current state of the simulation, this is updated at every step() call
-        self.current_state :State = deepcopy(self.initial_state)
+        self.current_state: State = deepcopy(self.initial_state)
         self.problem_generator = problem_generator  # during reset this will generate a new instance of state
         self.current_time = 0  # a ticker which updates at the end of every step() to the next time step
         self.num_max_nodes = num_max_nodes
@@ -60,8 +60,8 @@ class Simulator(Env):
 
     def render(self, mode="human", close=False) -> None:
         """
-        this function is needed for gym environment. for now doesn't do anything. in the future should create a scatter
-        plot of the current state (vehicle and customer locations)
+        this function is needed for gym environment. for now doesn't do anything. in the future should create a graph
+        of the current state
         :param mode:
         :param close:
         :return:
