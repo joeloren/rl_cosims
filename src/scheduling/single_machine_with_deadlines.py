@@ -1,7 +1,8 @@
+from gym import Env
 from src.utils.random_utils import process_random
 
 
-class SingleMachineWithDeadline:
+class SingleMachineWithDeadline(Env):
 
     def __init__(self,
                  maximal_num_jobs,
