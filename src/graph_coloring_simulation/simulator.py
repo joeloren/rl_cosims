@@ -16,7 +16,10 @@ class State:
     graph: nx.Graph  # this represents in the graph using network x representation
     num_colored_nodes: int  # number of colored nodes so far
     node_order: List  # list of the order the nodes were chosen
-    # each node in the graph has : "color"
+    # each node in the graph has :
+    #   - color : the color of the node (default is -1)
+    #   - visible: if True node is visible at the current time, otherwise False
+    #   - open_time: time when node starts to be visible (in offline problem all start_time is 0)
     # each edge has a weight (assuming for now all edges have the same weight)
 
 
@@ -34,7 +37,7 @@ class Simulator(Env):
         """
         super().__init__()
         # initial state is empty data variables if self.reset() is not called
-        self.initial_state: State = State(unique_colors= set(), graph=nx.Graph(), num_colored_nodes=0, node_order=[])
+        self.initial_state: State = State(unique_colors=set(), graph=nx.Graph(), num_colored_nodes=0, node_order=[])
         # current state of the simulation, this is updated at every step() call
         self.current_state: State = deepcopy(self.initial_state)
         self.problem_generator = problem_generator  # during reset this will generate a new instance of state
@@ -89,7 +92,7 @@ class Simulator(Env):
         for neighbor_node in self.current_state.graph.neighbors(node_chosen):
             if neighbor_node['color'] == color_chosen:
                 raise ValueError(f"chose invalid color for node id: {node_chosen}, "
-                      f"problem is with neighbor node id:{neighbor_node}")
+                                 f"problem is with neighbor node id:{neighbor_node}")
         # assuming we didn't fail in the previous check, update the color of the node chosen to be the new color
         self.current_state.graph.nodes[node_chosen]['color'] = color_chosen
         if color_chosen not in self.current_state.unique_colors:
@@ -98,6 +101,7 @@ class Simulator(Env):
         self.current_state.node_order.append(node_chosen)
         reward = len(self.current_state.unique_colors)
         is_done = self.calc_is_done()
+        self.current_time += 1
         return self.current_state_to_observation(), reward, is_done, {}
 
     def calc_is_done(self):
@@ -125,12 +129,6 @@ class Simulator(Env):
                'nodes_id': nodes_id}
         return obs
 
-
-
-
-
-
-
-
-
+    # def change_visibility_of_nodes(self):
+    #     for node in self.current_state.graph.nodes:
 

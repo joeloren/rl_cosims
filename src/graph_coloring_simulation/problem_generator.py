@@ -1,8 +1,13 @@
+# basic imports
 from abc import ABC, abstractmethod
-
+from typing import List
+from copy import deepcopy
+# mathematical imports
 import numpy as np
 from scipy import stats
 import networkx as nx
+# our imports
+from src.graph_coloring_simulation.simulator import State
 
 
 class ScenarioGenerator(ABC):
@@ -38,4 +43,34 @@ def generate_random_graph(number_of_nodes, probability_of_edge):
     return G.number_of_edges(), edges
 
 
+class FixedGraphGenerator(ScenarioGenerator):
+    """
+    this class creates a problem generator that always returns the same initial graph
+    """
+    def __init__(self, nodes_ids: List, edge_indexes: List):
+        """
+        initialize the class with the variables that create the graph
+        :param nodes_ids: nodes iid (this is used as the identifier for the node, each node has a unique id)
+        :param edge_indexes: tuple (u, v) indicates an edge between node u and node v
+        """
+        self.nodes_id = nodes_ids
+        self.edge_indexes = edge_indexes
+        self.graph = nx.Graph()
+        # add nodes to graph with the features:
+        #   - color : the color of the node (default is -1)
+        #   - visible: if True node is visible at the current time, otherwise False
+        #   - open_time: time when node starts to be visible (in offline problem all start_time is 0)
+        [self.graph.add_node(i, attr_dict={"color": -1, "start_time": 0, "visible": True}) for i in self.nodes_id]
+        [self.graph.add_edge(u, v) for (u, v) in self.edge_indexes]
+
+    def seed(self, seed: int) -> None:
+        pass
+
+    def reset(self) -> State:
+
+        state = State(unique_colors=set(),
+                      graph=deepcopy(self.graph),
+                      num_colored_nodes=0,
+                      node_order=[])
+        return state
 
