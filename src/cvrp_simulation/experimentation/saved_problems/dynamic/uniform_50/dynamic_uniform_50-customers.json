@@ -1,0 +1,8 @@
+{
+  "max_customer_times": 30,
+  "size": 50,
+  "vehicle_velocity": 2,
+  "vehicle_capacity": 40,
+  "max_demand": 10,
+  "start_at_depot": true
+}

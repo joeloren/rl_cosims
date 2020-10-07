@@ -1,0 +1,32 @@
+{
+  "max_customer_times": 10,
+  "size": 20,
+  "vehicle_velocity": 1,
+  "vehicle_capacity": 30,
+  "max_demand": 10,
+  "start_at_depot": true,
+  "distributions_params":
+  {
+      "params":
+      {
+        "customer_positions":
+        {
+          "x":
+           [[0.25, 0.1],
+            [0.75, 0.1]],
+          "y":
+           [[0.25, 0.1],
+            [0.75, 0.1]]
+        },
+        "customer_times":
+         [[5,  3],
+          [20, 3],
+          [40, 3]]
+      },
+      "weights":
+      {
+          "customer_positions": [0.5, 0.5],
+          "customer_times":  [0.33333, 0.33333, 0.33333]
+      }
+  }
+}
