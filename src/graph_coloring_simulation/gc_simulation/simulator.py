@@ -15,10 +15,9 @@ class State:
     unique_colors: Set[int]  # this is a set of unique colors already used in the graph
     graph: nx.Graph  # this represents in the graph using network x representation
     num_colored_nodes: int  # number of colored nodes so far
-    node_order: List  # list of the order the nodes were chosen
+    nodes_order: List  # list of the order the nodes were chosen
     # each node in the graph has :
     #   - color : the color of the node (default is -1)
-    #   - visible: if True node is visible at the current time, otherwise False
     #   - open_time: time when node starts to be visible (in offline problem all start_time is 0)
     # each edge has a weight (assuming for now all edges have the same weight)
 
@@ -29,7 +28,7 @@ class Simulator(Env):
 
     def __init__(self, num_max_nodes: int, problem_generator) -> None:
         """
-        Create a new graph_coloring_simulation. Note that you need to call reset() before starting the simulation.
+        Create a new graph_coloring_simulation. Note that you need to call reset() before starting the cvrp_simulation.
         :param num_nodes: number of nodes in the graph [int]
         :param problem_generator: a generator of type ScenarioGenerator which generates one instance of the cvrp problem
         and returns the initial state of the problem
@@ -37,8 +36,8 @@ class Simulator(Env):
         """
         super().__init__()
         # initial state is empty data variables if self.reset() is not called
-        self.initial_state: State = State(unique_colors=set(), graph=nx.Graph(), num_colored_nodes=0, node_order=[])
-        # current state of the simulation, this is updated at every step() call
+        self.initial_state: State = State(unique_colors=set(), graph=nx.Graph(), num_colored_nodes=0, nodes_order=[])
+        # current state of the cvrp_simulation, this is updated at every step() call
         self.current_state: State = deepcopy(self.initial_state)
         self.problem_generator = problem_generator  # during reset this will generate a new instance of state
         self.current_time = 0  # a ticker which updates at the end of every step() to the next time step
@@ -90,7 +89,7 @@ class Simulator(Env):
         color_chosen = action_chosen[1]
         # make sure  the color chosen is valid:
         for neighbor_node in self.current_state.graph.neighbors(node_chosen):
-            if neighbor_node['color'] == color_chosen:
+            if self.current_state.graph.nodes[neighbor_node]['color'] == color_chosen:
                 raise ValueError(f"chose invalid color for node id: {node_chosen}, "
                                  f"problem is with neighbor node id:{neighbor_node}")
         # assuming we didn't fail in the previous check, update the color of the node chosen to be the new color
@@ -98,7 +97,7 @@ class Simulator(Env):
         if color_chosen not in self.current_state.unique_colors:
             self.current_state.unique_colors.add(color_chosen)
         self.current_state.num_colored_nodes += 1
-        self.current_state.node_order.append(node_chosen)
+        self.current_state.nodes_order.append(node_chosen)
         reward = len(self.current_state.unique_colors)
         is_done = self.calc_is_done()
         self.current_time += 1
@@ -107,7 +106,7 @@ class Simulator(Env):
     def calc_is_done(self):
         """
         calculate if the simulation is done
-        simulation is done if the number of nodes in the graph is equal to the number of nodes we colored
+        simulation is done if the number of nodes in the graph are equal to the number of nodes we colored
         """
         if self.current_state.graph.number_of_nodes() == self.current_state.num_colored_nodes:
             return True
@@ -120,15 +119,13 @@ class Simulator(Env):
         """
         nodes_id = np.array(self.current_state.graph.nodes)
         colors = nx.get_node_attributes(self.current_state.graph, 'color')
-        nodes_color = np.array([colors[i] for i in nodes_id])
-        used_colors = np.zeros_like(self.num_max_nodes)
-        for color_id in self.current_state.unique_colors:
-            used_colors[color_id] = 1
-        obs = {'nodes_color': nodes_color,
-               'used_colors': used_colors,
-               'nodes_id': nodes_id}
+        node_colors = np.array([colors[i] for i in nodes_id])
+        obs = {
+            'node_colors': node_colors,
+            'used_colors': deepcopy(self.current_state.unique_colors),
+            'nodes_id': nodes_id,
+            'edge_indexes': list(self.current_state.graph.edges)
+        }
         return obs
 
-    # def change_visibility_of_nodes(self):
-    #     for node in self.current_state.graph.nodes:
-
+    # def get_allowed_colors(self, current_state):

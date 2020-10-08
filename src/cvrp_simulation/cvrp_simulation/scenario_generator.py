@@ -5,8 +5,8 @@ from copy import deepcopy
 import numpy as np
 from scipy import stats
 # our imports
-from src.cvrp_simulation.distributions.mixture_distribution import MixtureModel
-from src.cvrp_simulation.simulation.simulator import State
+from src.cvrp_simulation.cvrp_distributions.mixture_distribution import MixtureModel
+from src.cvrp_simulation.cvrp_simulation.simulator import State
 
 
 class ScenarioGenerator(ABC):
@@ -42,7 +42,7 @@ class SampleStaticBenchmark(ScenarioGenerator):
         vrp_size: int,
         start_at_depot: bool = False,
     ) -> None:
-        """A ScenarioGenerator for the cvrp problem which generates a random problem each time based on distributions
+        """A ScenarioGenerator for the cvrp problem which generates a random problem each time based on cvrp_distributions
         wanted for each variable
         :param depot_position_rv: the depot position (scipy) random variable
         :param vehicle_position_rv: the vehicles starting position (scipy) random variable
@@ -66,7 +66,7 @@ class SampleStaticBenchmark(ScenarioGenerator):
 
     def reset(self) -> State:
         """
-        this function creates a new state based on all random variables and distributions
+        this function creates a new state based on all random variables and cvrp_distributions
         :return: state [State] - new problem state
         """
         depot_pos = self.depot_position_rv.rvs(2)
@@ -121,7 +121,7 @@ class SampleDynamicBenchmark(ScenarioGenerator):
         start_at_depot: bool,
     ) -> None:
         """A ScenarioGenerator for the cvrp problem which generates a random problem
-        each time based on distributions wanted for each variable
+        each time based on cvrp_distributions wanted for each variable
         :param depot_position_rv: the depot position (scipy) random variable
         :param vehicle_position_rv: the vehicles starting position (scipy) random variable
         :param vehicle_capacity: the vehicles total capacity [int], for now this is constant
@@ -149,7 +149,7 @@ class SampleDynamicBenchmark(ScenarioGenerator):
 
     def reset(self) -> State:
         """
-        this function creates a new state based on all random variables and distributions
+        this function creates a new state based on all random variables and cvrp_distributions
         :return: state [State] - new problem state
         """
         depot_pos = self.depot_position_rv.rvs(2)
@@ -190,7 +190,7 @@ class SampleDynamicBenchmark(ScenarioGenerator):
     def reset_customer(self, t):
         """
         this function receives the current time and returns one future customer properties based on wanted distribution
-        :param t - current simulation time
+        :param t - current cvrp_simulation time
         : return
         """
         customer_properties = {}
@@ -209,7 +209,7 @@ class SampleDynamicBenchmark(ScenarioGenerator):
         customer_properties["demand"] = self.customer_demands_rv.rvs(size=1)
         # customer_properties['time'] = self.customer_times_rv.rvs(1)
         # create a new time from distribution but only accept time that is larger than current
-        # simulation time
+        # cvrp_simulation time
         # allow 6000 tries
         for i in range(6000):
             customer_time = self.customer_times_rv.rvs(1)
@@ -228,8 +228,8 @@ class SampleDynamicBenchmark(ScenarioGenerator):
         """
         this function receives the current time and number of customers to create
         and returns one future customer properties based on wanted distribution
-        :param t - current simulation time
-        :param n_customer_to_create - number of customers to create new distributions for
+        :param t - current cvrp_simulation time
+        :param n_customer_to_create - number of customers to create new cvrp_distributions for
         : return
         """
         customer_properties = {}
@@ -252,7 +252,7 @@ class SampleDynamicBenchmark(ScenarioGenerator):
         customer_properties["demand"] = self.customer_demands_rv.rvs(
             size=n_customer_to_create
         )
-        # create a new time from distribution but only accept time that is larger than current simulation time
+        # create a new time from distribution but only accept time that is larger than current cvrp_simulation time
         # allow 250 tries
         customer_times_used = np.zeros(shape=n_customer_to_create)
         customer_times = self.customer_times_rv.rvs(n_customer_to_create * 200)
@@ -267,7 +267,7 @@ class SampleDynamicBenchmark(ScenarioGenerator):
                 f"ran 100 times and did not find a time for "
                 f"{n_missing_customers} future customers that is larger than current time:"
                 f"{t:.3f},"
-                f"using uniform between current time and final simulation time - "
+                f"using uniform between current time and final cvrp_simulation time - "
                 f"{self.customer_times_rv.b}"
             )
         customer_properties["time"] = customer_times_used
@@ -338,7 +338,7 @@ class FixedSample(ScenarioGenerator):
         """
         this function receives the current time and returns one future customer based on wanted
         distribution
-        in the fixed case there are no distributions so there is no need for this function and it
+        in the fixed case there are no cvrp_distributions so there is no need for this function and it
         will return None
         """
         return None

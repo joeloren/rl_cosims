@@ -2,7 +2,6 @@ import argparse
 import json
 import traceback
 from typing import Callable, Dict
-from functools import partial
 from trains import Task
 from matplotlib import pyplot as plt
 import os
@@ -12,15 +11,14 @@ import numpy as np
 from gym import Env
 from tqdm import tqdm
 
-from src.cvrp_simulation.simulation.simulator import CVRPSimulation
+from src.cvrp_simulation.cvrp_simulation.simulator import CVRPSimulation
 from src.cvrp_simulation.cvrp_baselines.simple_baseline import (
     random_policy,
     distance_proportional_policy,
-    action_selector,
 )
 from src.cvrp_simulation.cvrp_baselines.or_tools_baseline import ORToolsPolicy
-from src.cvrp_simulation.plot_results import plot_vehicle_routes, plot_value_stats
-from src.cvrp_simulation.experimentation.problems import (
+from src.cvrp_simulation.cvrp_utils.plot_results import plot_vehicle_routes
+from src.cvrp_simulation.cvrp_experimentation.problems import (
     create_fixed_static_problem,
     create_uniform_dynamic_problem,
     create_mixture_guassian_dynamic_problem,
@@ -29,12 +27,12 @@ from src.cvrp_simulation.cvrp_baselines.sweep_baseline import SweepPolicy
 
 
 def evaluate_policy_simple(
-    problems: Dict[int, Env],
-    policy: Callable[[dict, Env], np.ndarray],
-    samples_per_seed=100,
-    logger=None,
-    save_routes=False,
-    policy_name=None,
+        problems: Dict[int, Env],
+        policy: Callable[[dict, Env], np.ndarray],
+        samples_per_seed=100,
+        logger=None,
+        save_routes=False,
+        policy_name=None,
 ):
     """For num_seeds times, determine the mean policy reward by running it samples_per_seed times.
     :param problems of type cvrp simulations
@@ -76,11 +74,11 @@ def evaluate_policy_simple(
 
 
 def evaluate_policy_simple_single_seed(
-    problem: CVRPSimulation,
-    policy: Callable[[dict, Env], np.ndarray],
-    seed: int,
-    samples_per_seed: int,
-    save_routes: bool = False,
+        problem: CVRPSimulation,
+        policy: Callable[[dict, Env], np.ndarray],
+        seed: int,
+        samples_per_seed: int,
+        save_routes: bool = False,
 ):
     total_rewards = []
     all_actions = []
@@ -238,67 +236,26 @@ def run_dynamic_benchmark(policy=random_policy):
 
 def main():
     warnings.filterwarnings("ignore")
-    POLICIES = [
-        "simple"
-    ]
+    POLICIES = ["simple"]
+    PROBLEMS = ["dynamic_uniform", "static_fixed", "dynamic_mixture_gaussian"]
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--problem_path",
-        type=str,
-        default="experimentation/saved_problems/dynamic/uniform_20/dynamic_uniform_20-customers.json",
-    )
-    parser.add_argument(
-        "--policies",
-        type=str,
-        default=[],
-        nargs="+",
-        choices=POLICIES,
-        help="Policies to be tested",
-    )
-    parser.add_argument(
-        "--problem",
-        type=str,
-        default="dynamic_uniform",
-        choices=["dynamic_uniform", "static_fixed", "dynamic_mixture_gaussian"],
-    )
+    parser.add_argument("--problem_path", type=str,
+                        default="gc_experimentation/saved_problems/dynamic/uniform_20/dynamic_uniform_20-customers.json")
+    parser.add_argument("--policies", type=str, default=["simple"], nargs="+", choices=POLICIES,
+                        help="Policies to be tested")
+    parser.add_argument("--problem", type=str, default="dynamic_uniform", choices=PROBLEMS, )
     parser.add_argument("--start_seed", type=int, default=0)
     parser.add_argument("--num_seeds", type=int, default=20)
-    parser.add_argument(
-        "--output_file",
-        type=str,
-        default="experimentation_cvrp/saved_problems/dynamic/uniform_20/results/results_20.json",
-    )
-    parser.add_argument(
-        "--save_routes",
-        action="store_true",
-        help="Save full route for each seed and each method",
-    )
-    parser.add_argument(
-        "--use_trains",
-        action="store_true",
-        help="if code should run logging with trains",
-    )
-    parser.add_argument(
-        "--trains_task_name",
-        type=str,
-        default="static gaussian",
-        help="name for task in trains",
-    )
-
-    parser.add_argument(
-        "--timeout", type=int, default=10, help="timeout for search algorithms"
-    )
-    parser.add_argument(
-        "--update_results",
-        action="store_true",
-        help="update the existing json files with new results",
-    )
-
+    parser.add_argument("--output_file", type=str,
+                        default="experimentation_cvrp/saved_problems/dynamic/uniform_20/results/results_20.json")
+    parser.add_argument("--use_trains", action="store_true", help="if code should run logging with trains")
+    parser.add_argument("--trains_task_name", type=str, default="static gaussian", help="name for task in trains")
+    parser.add_argument("--save_routes", action="store_true", help="Save full route for each seed and each method")
+    parser.add_argument("--timeout", type=int, default=10, help="timeout for search algorithms")
+    parser.add_argument("--update_results", action="store_true", help="update the existing json files with new results")
     args = parser.parse_args()
     if args.use_trains:
-        task = Task.init(
-            project_name="cvrp_dynamic_baselines", task_name=args.trains_task_name
-        )
+        task = Task.init(project_name="cvrp_dynamic_baselines", task_name=args.trains_task_name)
         logger = Task.current_task().get_logger()
     else:
         logger = None
@@ -312,20 +269,15 @@ def main():
             parameters = task.connect(problem_params)
     if args.problem == "dynamic_uniform":
         envs = {
-            args.start_seed
-            + seed: create_uniform_dynamic_problem(
-                **problem_params, random_seed=args.start_seed + seed
-            )
+            args.start_seed + seed: create_uniform_dynamic_problem(**problem_params, random_seed=args.start_seed + seed)
             for seed in range(args.num_seeds)
-        }
+            }
     elif args.problem == "dynamic_mixture_gaussian":
         envs = {
-            args.start_seed
-            + seed: create_mixture_guassian_dynamic_problem(
-                **problem_params, random_seed=args.start_seed + seed
-            )
-            for seed in range(args.num_seeds)
-        }
+                args.start_seed + seed: create_mixture_guassian_dynamic_problem(**problem_params,
+                                                                                random_seed=args.start_seed + seed)
+                for seed in range(args.num_seeds)
+                }
     elif args.problem == "static_fixed":
         envs = {
             args.start_seed + seed: create_fixed_static_problem(**problem_params)
@@ -339,58 +291,31 @@ def main():
     values = {}
     policies = args.policies
     if "simple" in policies:
-        values["Uniformly Random"] = evaluate_policy_simple(
-            envs,
-            random_policy,
-            samples_per_seed=5,
-            logger=logger,
-            save_routes=save_routes,
-        )
-        values["Inversely Proportional to Distance"] = evaluate_policy_simple(
-            envs,
-            distance_proportional_policy,
-            samples_per_seed=5,
-            logger=logger,
-            save_routes=save_routes,
-        )
-        # values["Savings"] = evaluate_policy_simple(
-        #     envs, savings_policy, samples_per_seed=5, logger=logger, save_routes=save_routes
-        # )
-        values["Sweep"] = evaluate_policy_simple(
-            envs,
-            sweep_policy,
-            samples_per_seed=5,
-            logger=logger,
-            save_routes=save_routes,
-        )
-        values["OR-Tools"] = evaluate_policy_simple(
-            envs, or_tools, samples_per_seed=5, logger=logger, save_routes=save_routes
-        )
+        values["Uniformly Random"] = evaluate_policy_simple(envs, random_policy, samples_per_seed=5, logger=logger,
+                                                            save_routes=save_routes)
+        values["Inversely Proportional to Distance"] = evaluate_policy_simple(envs, distance_proportional_policy,
+                                                                              samples_per_seed=5, logger=logger,
+                                                                              save_routes=save_routes, )
+        values["Sweep"] = evaluate_policy_simple(envs, sweep_policy, samples_per_seed=5, logger=logger,
+                                                 save_routes=save_routes, )
+        values["OR-Tools"] = evaluate_policy_simple(envs, or_tools, samples_per_seed=5, logger=logger,
+                                                    save_routes=save_routes)
 
     expensive_policies = []
     # Run evaluation of specified policies
     for policy_name, policy, env_list in expensive_policies:
         print("Evaluating: ", policy_name)
-        values[policy_name] = evaluate_policy_simple(
-            env_list,
-            policy,
-            samples_per_seed=args.mcts_num_samples_per_seed,
-            logger=logger,
-            save_routes=save_routes,
-            policy_name=policy_name,
-        )
+        values[policy_name] = evaluate_policy_simple(env_list, policy, samples_per_seed=5, logger=logger,
+                                                     save_routes=save_routes, policy_name=policy_name)
 
     if args.update_results:
         with open(args.output_file) as fp:
             res = json.loads(fp.read())
-
         res.update(values)
         values = res
 
     with open(args.output_file, "w") as f:
         json.dump(values, f, indent=4)
-    if args.use_trains:
-        task.upload_artifact("values", values)
 
 
 if __name__ == "__main__":

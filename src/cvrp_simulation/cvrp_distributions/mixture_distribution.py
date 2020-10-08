@@ -8,7 +8,7 @@ from scipy.stats import rv_continuous
 
 class MixtureModel(rv_continuous):
     """
-    this class creates a mixture of distributions using the scipy random generator library.
+    this class creates a mixture of cvrp_distributions using the scipy random generator library.
     """
 
     def __init__(self, submodels: list, weights: list, a: int, b: int, *args, **kwargs):
@@ -53,7 +53,7 @@ class MixtureModel(rv_continuous):
 class TruncatedGaussian2D(rv_continuous):
     """
     this class creates a truncated 2d gaussian distribution used for positions or any other 2d
-    variable in the simulation
+    variable in the cvrp_simulation
     """
 
     def __init__(self, submodels: list, a: int, b: int, *args, **kwargs):

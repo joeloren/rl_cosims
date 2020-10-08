@@ -54,7 +54,7 @@ def distance_proportional_policy(obs, env):
 
 def create_benchmark_generator():
     CAPACITIES = {10: 20.0, 20: 30.0, 50: 40.0, 100: 50.0}
-    # create random input based on benchmark distributions -
+    # create random input based on benchmark cvrp_distributions -
     depot_position_rv = stats.uniform(loc=0, scale=1)
     vehicle_position_rv = stats.uniform(loc=0, scale=1)
     customer_positions_rv = stats.uniform(loc=0, scale=1)
