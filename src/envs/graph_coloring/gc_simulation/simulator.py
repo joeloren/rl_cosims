@@ -87,12 +87,15 @@ class Simulator(Env):
     def step(self, action_chosen: (int, int)) -> (float, int, bool, Dict):
         node_chosen = action_chosen[0]
         color_chosen = action_chosen[1]
+        # make sure node chosen has no color yet (color = -1)
+        if self.current_state.graph.nodes()[node_chosen]['color'] != -1:
+            return ValueError(f"node chosen has already been colored in previous steps, node id:{node_chosen}")
         # make sure  the color chosen is valid:
         for neighbor_node in self.current_state.graph.neighbors(node_chosen):
             if self.current_state.graph.nodes[neighbor_node]['color'] == color_chosen:
                 raise ValueError(f"chose invalid color for node id: {node_chosen}, "
                                  f"problem is with neighbor node id:{neighbor_node}")
-        # assuming we didn't fail in the previous check, update the color of the node chosen to be the new color
+        # assuming we didn't fail in the previous checks, update the color of the node chosen to be the new color
         self.current_state.graph.nodes[node_chosen]['color'] = color_chosen
         if color_chosen not in self.current_state.unique_colors:
             self.current_state.unique_colors.add(color_chosen)
