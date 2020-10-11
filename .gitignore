@@ -137,3 +137,4 @@ dmypy.json
 # training folders
 runs/
 experiments/
+results/
