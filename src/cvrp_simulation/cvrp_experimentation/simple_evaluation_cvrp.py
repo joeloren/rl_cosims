@@ -107,13 +107,9 @@ def evaluate_policy_simple_single_seed(
             completed = False
             while not completed:
                 if obs["customer_positions"].size > 0:
-                    if isinstance(policy, FastMCTSPolicy):
-                        act = policy(obs, problem)
-                        customer_chosen = problem.get_customer_index(act)
-                    else:
-                        action_probs = policy(obs, problem)
-                        act = np.random.choice(len(obs["action_mask"]), p=action_probs)
-                        customer_chosen = problem.get_customer_index(act)
+                    action_probs = policy(obs, problem)
+                    act = np.random.choice(len(obs["action_mask"]), p=action_probs)
+                    customer_chosen = problem.get_customer_index(act)
                 else:
                     # for now if there are no customers choose noop if it is valid, otherwise depot
                     if problem.allow_noop:
@@ -240,14 +236,14 @@ def main():
     PROBLEMS = ["dynamic_uniform", "static_fixed", "dynamic_mixture_gaussian"]
     parser = argparse.ArgumentParser()
     parser.add_argument("--problem_path", type=str,
-                        default="gc_experimentation/saved_problems/dynamic/uniform_20/dynamic_uniform_20-customers.json")
+                        default="cvrp_experimentation/saved_problems/dynamic/uniform_20/dynamic_uniform_20-customers.json")
     parser.add_argument("--policies", type=str, default=["simple"], nargs="+", choices=POLICIES,
                         help="Policies to be tested")
     parser.add_argument("--problem", type=str, default="dynamic_uniform", choices=PROBLEMS, )
     parser.add_argument("--start_seed", type=int, default=0)
     parser.add_argument("--num_seeds", type=int, default=20)
     parser.add_argument("--output_file", type=str,
-                        default="experimentation_cvrp/saved_problems/dynamic/uniform_20/results/results_20.json")
+                        default="cvrp_experimentation/saved_problems/dynamic/uniform_20/results/results_20.json")
     parser.add_argument("--use_trains", action="store_true", help="if code should run logging with trains")
     parser.add_argument("--trains_task_name", type=str, default="static gaussian", help="name for task in trains")
     parser.add_argument("--save_routes", action="store_true", help="Save full route for each seed and each method")
@@ -268,6 +264,7 @@ def main():
         if args.use_trains:
             parameters = task.connect(problem_params)
     if args.problem == "dynamic_uniform":
+        ""
         envs = {
             args.start_seed + seed: create_uniform_dynamic_problem(**problem_params, random_seed=args.start_seed + seed)
             for seed in range(args.num_seeds)
