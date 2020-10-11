@@ -81,6 +81,7 @@ def main():
     parser.add_argument("--update_results", action="store_true", help="update the existing json files with new results")
 
     args = parser.parse_args()
+    np.random.seed(seed=args.start_seed)
     output_dir = os.path.dirname(args.output_file)
     os.makedirs(output_dir, exist_ok=True)
 
