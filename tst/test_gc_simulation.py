@@ -1,8 +1,7 @@
 import numpy as np
-import networkx as nx
 
-from src.graph_coloring_simulation.gc_experimentation.problems import create_fixed_static_problem
-from src.graph_coloring_simulation.gc_baselines.simple_policies import random_policy
+from src.envs.graph_coloring import create_fixed_static_problem
+from src.envs.graph_coloring.gc_baselines.simple_policies import random_policy
 
 
 def test_fixed_problem():
