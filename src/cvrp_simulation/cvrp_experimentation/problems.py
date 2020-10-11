@@ -1,7 +1,7 @@
 import numpy as np
-from src.cvrp_simulation.distributions.mixture_distribution import MixtureModel, TruncatedGaussian2D
-from src.cvrp_simulation.simulation.scenario_generator import FixedSample, SampleDynamicBenchmark
-from src.cvrp_simulation.simulation.simulator import CVRPSimulation
+from src.cvrp_simulation.cvrp_distributions.mixture_distribution import MixtureModel, TruncatedGaussian2D
+from src.cvrp_simulation.cvrp_simulation.scenario_generator import FixedSample, SampleDynamicBenchmark
+from src.cvrp_simulation.cvrp_simulation.simulator import CVRPSimulation
 from scipy import stats
 
 
@@ -82,14 +82,14 @@ def create_mixture_guassian_dynamic_problem(
     distributions_params: dict,
 ):
     """
-    this function creates a simulation based on given gaussian parameters for spatial distribution
+    this function creates a cvrp_simulation based on given gaussian parameters for spatial distribution
     :param max_customer_times: maximum time for customer to arrive
     :param size - size of problem (graph size)
     :param vehicle_capacity - initial vehicle capacity (this will also be the capacity when the vehicle returns to depot
-    :param vehicle_velocity - vehicle velocity, this determins the simulation time since when the
+    :param vehicle_velocity - vehicle velocity, this determins the cvrp_simulation time since when the
     vehicle goes to a customer the time will be : distance*vehicle_velocity
     :param max_demand - maximum demand for customer_demand distribution
-    :param random_seed - seed for distributions random generator
+    :param random_seed - seed for cvrp_distributions random generator
     :param start_at_depot - boolean if vehicle should start at depot or random location
     :param distributions_params - dictionary of distribution parameters for the customer position
     and time (if dynamic) - params: for each parameter that we want to have mixture gaussian there is a
@@ -140,7 +140,7 @@ def create_mixture_guassian_dynamic_problem(
 
 def get_truncated_submodels(params, min_lim, max_lim):
     """
-    this function returns a list of truncated normal distributions to use in the mixture gaussian
+    this function returns a list of truncated normal cvrp_distributions to use in the mixture gaussian
     distribution
     """
     submodels = []
@@ -156,14 +156,14 @@ def get_truncated_2d_submodels(params_x, params_y, min_lim, max_lim):
     this function creates a truncated 2d random variable where the output has 2 dimensions [x, y]
     the number of truncated random variables created is the same as the number of [mu, sigma] in
     params_x and params_y
-    :param params_x [N, 2] this is the mu and sigma for the number of distributions wanted for
+    :param params_x [N, 2] this is the mu and sigma for the number of cvrp_distributions wanted for
     the mixture gaussian of x
-    :param params_y [N, 2] this is the mu and sigma for the number of distributions wanted for
+    :param params_y [N, 2] this is the mu and sigma for the number of cvrp_distributions wanted for
     the mixture gaussian of y
     : min_lim [float] the lower limit of the truncated normal distribution (a in scipy language)
     : max_lim [float] the upper limit of the truncated normal distribution (b in scipy language)
     param_x and param_y must have the same length!
-    return [N] 2d gaussian distributions where each one has a [mu_x, mu_y] and [sigma_x, sigma_y]
+    return [N] 2d gaussian cvrp_distributions where each one has a [mu_x, mu_y] and [sigma_x, sigma_y]
     """
     submodels = []
     for i in range(len(params_x)):

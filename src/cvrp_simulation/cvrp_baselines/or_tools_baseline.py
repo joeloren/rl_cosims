@@ -7,9 +7,9 @@ from ortools.constraint_solver import pywrapcp
 from scipy import stats
 # our imports
 from src.cvrp_simulation.cvrp_baselines import simple_baseline
-from src.cvrp_simulation.plot_results import plot_vehicle_routes
-from src.cvrp_simulation.simulation.scenario_generator import (FixedSample, SampleStaticBenchmark)
-from src.cvrp_simulation.simulation.simulator import CVRPSimulation
+from src.cvrp_simulation.cvrp_utils.plot_results import plot_vehicle_routes
+from src.cvrp_simulation.cvrp_simulation.scenario_generator import (FixedSample, SampleStaticBenchmark)
+from src.cvrp_simulation.cvrp_simulation.simulator import CVRPSimulation
 
 
 def create_data_model(obs, env, precision=1000):
@@ -279,7 +279,7 @@ if __name__ == "__main__":
     num_runs = 1
     if run_benchmark:
         CAPACITIES = {10: 20, 20: 30, 50: 40, 100: 50}
-        # create random input based on benchmark distributions -
+        # create random input based on benchmark cvrp_distributions -
         depot_position_rv = stats.uniform(loc=0, scale=1)
         vehicle_position_rv = stats.uniform(loc=0, scale=1)
         customer_positions_rv = stats.uniform(loc=0, scale=1)
