@@ -148,7 +148,7 @@ def evaluate_policy_simple_single_seed(
 
 
 def run_simple_test():
-    # check cvrp and state -
+    # check cvrp simulation and state -
     sim = create_fixed_static_problem()
     obs = sim.reset()
     # in this case each time we choose action 0 since the available actions change each time

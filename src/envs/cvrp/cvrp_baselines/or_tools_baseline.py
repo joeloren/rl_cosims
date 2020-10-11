@@ -279,7 +279,7 @@ if __name__ == "__main__":
     num_runs = 1
     if run_benchmark:
         CAPACITIES = {10: 20, 20: 30, 50: 40, 100: 50}
-        # create random input based on benchmark cvrp_distributions -
+        # create random input based on benchmark distributions -
         depot_position_rv = stats.uniform(loc=0, scale=1)
         vehicle_position_rv = stats.uniform(loc=0, scale=1)
         customer_positions_rv = stats.uniform(loc=0, scale=1)

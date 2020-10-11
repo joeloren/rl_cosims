@@ -77,7 +77,7 @@ def plot_vehicle_routes(
 def plot_value_stats(values):
     """
     this function plots the values of each policy
-    :param values: the values of running cvrp cvrp for each policy
+    :param values: the values of running cvrp simulation for each policy
     """
     _, ax = plt.subplots(1, 1)
     for policy_name in values.keys():
@@ -124,7 +124,7 @@ def main():
     seed = 50
     rand_reward = np.zeros(num_runs)
     print("--------------------------------------")
-    print("benchmark cvrp testing:")
+    print("benchmark simulation testing:")
     sim = CVRPSimulation(max_customers=vrp_size, problem_generator=benchmark_generator)
     sim.seed(seed)
     for i in range(num_runs):

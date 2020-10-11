@@ -53,7 +53,7 @@ class MixtureModel(rv_continuous):
 class TruncatedGaussian2D(rv_continuous):
     """
     this class creates a truncated 2d gaussian distribution used for positions or any other 2d
-    variable in the cvrp
+    variable in the simulation
     """
 
     def __init__(self, submodels: list, a: int, b: int, *args, **kwargs):

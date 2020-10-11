@@ -200,7 +200,7 @@ class SweepPolicy:
                 probs[action] = 1
 
             # otherwise there are no customers opened in the problem and
-            # therefore the cvrp will choose the noop option
+            # therefore the simulation will choose the noop option
             self.next_action += 1
             return probs
 

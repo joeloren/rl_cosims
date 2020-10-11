@@ -9,7 +9,7 @@ from gym import Env, spaces
 @dataclass
 class State:
     """
-    this class defines the cvrp state at every time step. this state describes the total
+    this class defines the simulation state at every time step. this state describes the total
     environment (including
     customers that are not known to the agent)
     """
@@ -32,7 +32,7 @@ class CVRPSimulation(Env):
 
     def __init__(self, max_customers: int, problem_generator, allow_noop=True) -> None:
         """
-        Create a new cvrp. Note that you need to call reset() before starting cvrp.
+        Create a new simulation. Note that you need to call reset() before starting simulation.
         :param max_customers: maximum number of customers in problem (graph size) [int]
         :param problem_generator: a generator of type ScenarioGenerator which generates one instance of the cvrp problem
         and returns the initial state of the problem
@@ -40,11 +40,11 @@ class CVRPSimulation(Env):
         """
         super().__init__()
         self.initial_state = None  # will be defined in reset() method
-        self.current_state = None  # current state of the cvrp, this is updated at every step() call
+        self.current_state = None  # current state of the simulation, this is updated at every step() call
         self.problem_generator = problem_generator  # during reset this will generate a new instance of state
         self.current_time = 0  # a ticker which updates at the end of every step() to the next time step
         self.max_customers = max_customers  # max number of customers in the problem (this is the max size of the graph)
-        self.allow_noop = allow_noop  # if noop action is allowed in cvrp
+        self.allow_noop = allow_noop  # if noop action is allowed in simulation
         self.NOOP_INDEX = -1
         self.DEPOT_INDEX = -2
         # create objects for gym environment
@@ -92,7 +92,7 @@ class CVRPSimulation(Env):
         the action is first translated to customer index and then state is updated in place
         :param action_chosen: index of action chosen from all options
         :return: the function returns the new observation [dict], reward [float] and if the
-        cvrp is done [bool]
+        simulation is done [bool]
         """
         # get the customer chosen based on the action chosen
         customer_index = self.get_customer_index(action_chosen)
@@ -132,9 +132,9 @@ class CVRPSimulation(Env):
             self.current_state.current_vehicle_position = customer_position
             self.current_state.current_vehicle_capacity -= customer_demand
 
-        # find if the cvrp is over
+        # find if the simulation is over
         is_done = self.calculate_is_complete()
-        # if cvrp is done, add returning to depot to reward
+        # if simulation is done, add returning to depot to reward
         if is_done:
             # to do if in the future we want to update the reward to include time, this also needs
             #  to be updated
@@ -242,9 +242,9 @@ class CVRPSimulation(Env):
         :param horizon_limit: this is the limit on how much of the horizon to create,
         if None creates the full horizon
         :param n_future_customers: if not None this is the maximum number of future customers to create
-        :return: copy_env: updated cvrp with new customers
+        :return: copy_env: updated simulation with new customers
         """
-        # print(f"resetting future for cvrp , t:{self.current_time}")
+        # print(f"resetting future for simulation , t:{self.current_time}")
         copy_env = deepcopy(self)
         copy_env.seed(seed)
         n_opened_customers = np.sum(copy_env.current_state.customer_times <= copy_env.current_time)
@@ -268,7 +268,7 @@ class CVRPSimulation(Env):
             future_customer_times = np.sort(new_customer_properties["time"])
         else:
             raise ValueError("in future_reset horizon_limit and n_future customers are both not equal to None, "
-                             "cvrp does not know what how many future customers to create")
+                             "simulation does not know what how many future customers to create")
         future_customer_positions = new_customer_properties["position"]
         future_customer_demands = new_customer_properties["demand"]
 
@@ -387,7 +387,7 @@ class CVRPSimulation(Env):
         if future_customer_times.size > 0:
             return np.min(future_customer_times)
         else:
-            # to do decide if the cvrp should send an exception or something else should
+            # to do decide if the simulation should send an exception or something else should
             #  happen in this case
             raise Exception(f"policy chose noop but there are no more customers that need to be opened")
 
