@@ -5,7 +5,7 @@ from copy import deepcopy
 # mathematical imports
 import networkx as nx
 # our imports
-from src.graph_coloring_simulation.gc_simulation.simulator import State
+from src.envs.graph_coloring.gc_simulation.simulator import State
 
 
 class ScenarioGenerator(ABC):
@@ -66,7 +66,7 @@ class FixedGraphGenerator(ScenarioGenerator):
     def next(self, current_state: State) -> State:
         """
         this function returns the current state with the updated graph
-        :param current_state: the current cvrp_simulation state with the current graph and other important details
+        :param current_state: the current cvrp state with the current graph and other important details
         :return: updated current state with new graph (added nodes and edges)
         """
         # in the fixed case, no new nodes are created,

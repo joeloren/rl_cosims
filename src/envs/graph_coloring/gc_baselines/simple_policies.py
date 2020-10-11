@@ -3,12 +3,12 @@ from typing import Tuple
 import numpy as np
 import networkx as nx
 # our imports
-from src.graph_coloring_simulation.gc_simulation.simulator import Simulator
+from src.envs.graph_coloring.gc_simulation.simulator import Simulator
 
 
 def random_policy(obs, env: Simulator) -> Tuple:
     """
-    this function chooses the node and color randomaly from the colors and nodes allowed
+    this function chooses the node and color randomly from the colors and nodes allowed
     :param obs: Dict - the current observation of the current state in the env
     :param env: Simulator - the environment of graph coloring problem
     :return: action: tuple - the action chosen by policy in format (node_chosen, action_chosen)
@@ -37,7 +37,7 @@ def random_policy(obs, env: Simulator) -> Tuple:
 
 def random_policy_without_newcolor(obs, env: Simulator) -> Tuple:
     """
-    this function chooses the node and color randomaly from the colors and nodes allowed
+    this function chooses the node and color randomly from the colors and nodes allowed
     :param obs: Dict - the current observation of the current state in the env
     :param env: Simulator - the environment of graph coloring problem
     :return: action: tuple - the action chosen by policy in format (node_chosen, action_chosen)

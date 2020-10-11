@@ -1,12 +1,10 @@
 import numpy as np
-from cvrp_simulation.plot_results import plot_vehicle_routes
-from cvrp_simulation.simulation.scenario_generator import (
-    FixedSample,
-    SampleStaticBenchmark,
-)
-from cvrp_simulation.simulation.simulator import CVRPSimulation
 from matplotlib import pyplot as plt
 from scipy import stats
+# our imports
+from src.envs.cvrp.cvrp_utils.plot_results import plot_vehicle_routes
+from src.envs.cvrp.cvrp_simulation.scenario_generator import FixedSample, SampleStaticBenchmark
+from src.envs.cvrp.cvrp_simulation.simulator import CVRPSimulation
 
 
 def random_policy(obs, env):

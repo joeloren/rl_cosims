@@ -11,10 +11,10 @@ import numpy as np
 from gym import Env
 from matplotlib import pyplot as plt
 # our imports
-from src.graph_coloring_simulation.gc_simulation.simulator import Simulator
-from src.graph_coloring_simulation.gc_experimentation.problems import create_fixed_static_problem
-from src.graph_coloring_simulation.gc_utils.plot_results import plot_gc_solution
-from src.graph_coloring_simulation.gc_baselines.simple_policies import random_policy_without_newcolor as random_policy
+from src.envs.graph_coloring.gc_simulation.simulator import Simulator
+from src.envs.graph_coloring.gc_experimentation.problems import create_fixed_static_problem
+from src.envs.graph_coloring.gc_utils.plot_results import plot_gc_solution
+from src.envs.graph_coloring.gc_baselines.simple_policies import random_policy_without_newcolor as random_policy
 
 
 def evaluate_policy_simple(problems: Dict[int, Env], policy: Callable[[dict, Env], np.ndarray], save_solution=True,
@@ -81,12 +81,12 @@ def main():
     parser.add_argument("--update_results", action="store_true", help="update the existing json files with new results")
 
     args = parser.parse_args()
+    np.random.seed(seed=args.start_seed)
     output_dir = os.path.dirname(args.output_file)
     os.makedirs(output_dir, exist_ok=True)
 
     with open(args.problem_path, "r") as f:
         problem_params = json.load(f)
-
     if args.problem == "fixed":
         envs = {
             args.start_seed + seed: create_fixed_static_problem(**problem_params, random_seed=args.start_seed + seed)

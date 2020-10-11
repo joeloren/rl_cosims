@@ -1,8 +1,9 @@
 import numpy as np
-from cvrp_simulation.simulation.scenario_generator import SampleStaticBenchmark
-from cvrp_simulation.simulation.simulator import CVRPSimulation
 from matplotlib import pyplot as plt
 from scipy import stats
+# our imports
+from src.envs.cvrp.cvrp_simulation.scenario_generator import SampleStaticBenchmark
+from src.envs.cvrp.cvrp_simulation.simulator import CVRPSimulation
 
 
 def discrete_cmap(n_colors, base_cmap=None):
@@ -76,7 +77,7 @@ def plot_vehicle_routes(
 def plot_value_stats(values):
     """
     this function plots the values of each policy
-    :param values: the values of running cvrp cvrp_simulation for each policy
+    :param values: the values of running cvrp simulation for each policy
     """
     _, ax = plt.subplots(1, 1)
     for policy_name in values.keys():
@@ -123,7 +124,7 @@ def main():
     seed = 50
     rand_reward = np.zeros(num_runs)
     print("--------------------------------------")
-    print("benchmark cvrp_simulation testing:")
+    print("benchmark simulation testing:")
     sim = CVRPSimulation(max_customers=vrp_size, problem_generator=benchmark_generator)
     sim.seed(seed)
     for i in range(num_runs):

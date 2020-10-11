@@ -3,12 +3,11 @@ import math
 import time
 
 import numpy as np
-from cvrp_simulation.experimentation.problems import (
-    create_uniform_dynamic_problem,
-    create_fixed_static_problem,
-)
-from cvrp_simulation.plot_results import plot_vehicle_routes
 from matplotlib import pyplot as plt
+# our imports
+from src.envs.cvrp.cvrp_experimentation.problems import (create_uniform_dynamic_problem,
+                                                         create_fixed_static_problem)
+from src.envs.cvrp.cvrp_utils.plot_results import plot_vehicle_routes
 
 
 def angle(depot, p):
@@ -182,8 +181,8 @@ class SweepPolicy:
         else:
             # find next customer from previously calculated route or from new route
             if (
-                self.current_solution is None
-                or (obs["current_vehicle_position"] == obs["depot_position"]).all()
+                    self.current_solution is None
+                    or (obs["current_vehicle_position"] == obs["depot_position"]).all()
             ):
                 self.current_solution = self.compute_route(obs, env)
                 self.next_action = 0
@@ -201,7 +200,7 @@ class SweepPolicy:
                 probs[action] = 1
 
             # otherwise there are no customers opened in the problem and
-            # therefore the cvrp_simulation will choose the noop option
+            # therefore the simulation will choose the noop option
             self.next_action += 1
             return probs
 
@@ -315,8 +314,8 @@ def main():
             f"total demand in route-{route_num} is:{vehicle_route[route_num]['total_demand']}"
         )
         if (
-            vehicle_route[route_num]["total_demand"]
-            > sim.initial_state.current_vehicle_capacity
+                vehicle_route[route_num]["total_demand"]
+                > sim.initial_state.current_vehicle_capacity
         ):
             assert Exception(
                 f"route {route_num} : customer demands: {vehicle_route[route_num]['total_demand']},"
