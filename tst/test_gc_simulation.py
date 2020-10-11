@@ -1,6 +1,6 @@
 import numpy as np
 
-from src.envs.graph_coloring import create_fixed_static_problem
+from src.envs.graph_coloring.gc_experimentation.problems import create_fixed_static_problem
 from src.envs.graph_coloring.gc_baselines.simple_policies import random_policy
 
 

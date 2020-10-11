@@ -12,9 +12,9 @@ from gym import Env
 from matplotlib import pyplot as plt
 # our imports
 from src.envs.graph_coloring.gc_simulation.simulator import Simulator
-from src.envs.graph_coloring import create_fixed_static_problem
+from src.envs.graph_coloring.gc_experimentation.problems import create_fixed_static_problem
 from src.envs.graph_coloring.gc_utils.plot_results import plot_gc_solution
-from src.envs.graph_coloring.gc_baselines.simple_policies import random_policy
+from src.envs.graph_coloring.gc_baselines.simple_policies import random_policy_without_newcolor as random_policy
 
 
 def evaluate_policy_simple(problems: Dict[int, Env], policy: Callable[[dict, Env], np.ndarray], save_solution=True,

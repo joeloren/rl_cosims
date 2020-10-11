@@ -25,7 +25,6 @@ class GeometricWrapper(Wrapper):
         # # add illegal actions to graph -
         # tg_obs.illegal_actions = torch.zeros(tg_obs.edge_index.shape[1], dtype=torch.bool,
         #                                      device=tg_obs.x.device)
-        self.num_nodes = tg_obs.x.shape[0]
         return tg_obs
 
     def step(self, reinforce_action):
@@ -44,7 +43,6 @@ class GeometricWrapper(Wrapper):
             action = reinforce_action - 1
         next_state, reward, done, _ = self.env.step(action)
         tg_obs = self.obs_to_graph(next_state)
-        self.num_nodes = tg_obs.edge_index.shape[1]
         return tg_obs, reward, done, {}
 
     def observation(self, obs):
@@ -100,6 +98,7 @@ class GeometricWrapper(Wrapper):
         actions_mask[1:] = obs['action_mask'][:-2]
         g_tensor.illegal_actions = torch.tensor(np.logical_not(actions_mask), dtype=torch.bool,
                                                 device=g_tensor.x.device)
+        self.num_nodes = g_tensor.x.shape[0]
         return g_tensor
 
 
@@ -118,7 +117,6 @@ class GeometricBidirectionalWrapper(Wrapper):
         obs = self.env.reset()
         # create tg observation from obs dictionary -
         tg_obs = self.observation(obs)
-        self.num_nodes = tg_obs.x.shape[0]
         return tg_obs
 
     def observation(self, obs):
@@ -184,8 +182,8 @@ class GeometricBidirectionalWrapper(Wrapper):
         # illegal actions is True if action is not valid)
         illegal_actions = torch.logical_not(torch.tensor(actions_mask, device=g_tensor.x.device))
         g_tensor.illegal_actions = illegal_actions
-        # g_tensor.illegal_actions = torch.logical_or(illegal_actions,
-        #                                             g_tensor.edge_index[0, :] >= num_customers + num_depots)
+        # update number of nodes in observation (used in step to translate action from agent to simulation)
+        self.num_nodes = g_tensor.x.shape[0]
         return g_tensor
 
     def step(self, reinforce_action: int):
@@ -203,7 +201,6 @@ class GeometricBidirectionalWrapper(Wrapper):
         else:
             action = reinforce_action - 1
         next_state, reward, done, _ = self.env.step(action)
-        tg_obs = self.obs_to_graph(next_state)
-        self.num_nodes = tg_obs.edge_index.shape[1]
+        tg_obs = self.obs_to_graph_dict(next_state)
         return tg_obs, reward, done, {}
 

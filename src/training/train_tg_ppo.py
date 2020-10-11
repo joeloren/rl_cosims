@@ -68,9 +68,9 @@ def main():
     max_customer_times = 0
     size = 10
     vehicle_velocity = 1
-    vehicle_capacity = 20
+    vehicle_capacity = 30
     random_seed = 0
-    max_demand = 50
+    max_demand = 10
     start_at_depot = True
     EVAL_BASELINES_RESULTS_FILENAME = (f'experiments/{size}s_{vehicle_capacity}c_{max_customer_times}t/'
                                        f'baseline_values.json')
@@ -95,8 +95,8 @@ def main():
         logger = None
 
     env = create_uniform_dynamic_problem(max_customer_times=max_customer_times, size=size, max_demand=max_demand,
-                                             vehicle_velocity=vehicle_velocity, vehicle_capacity=vehicle_capacity,
-                                             random_seed=random_seed, start_at_depot=start_at_depot)
+                                         vehicle_velocity=vehicle_velocity, vehicle_capacity=vehicle_capacity,
+                                         random_seed=random_seed, start_at_depot=start_at_depot)
     tg_env = TgWrapper(env)
     tg_env.reset()
 
@@ -151,7 +151,7 @@ def main():
     if not baseline_results_path.exists():
         baseline_values = {
             'distance': evaluate_policy_simple(env, eval_seeds, distance_proportional_policy, samples_per_seed=5),
-            }
+        }
         baseline_results_path.parent.mkdir(parents=True, exist_ok=True)
         with open(baseline_results_path, 'w') as f:
             json.dump(baseline_values, f, indent=2)

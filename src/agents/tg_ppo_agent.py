@@ -333,15 +333,15 @@ class PPOAgent:
                 relative_diff = (100 * (total_rewards - values_dict[seed]) / values_dict[seed])
                 errors_dict[baseline].append(relative_diff)
         mean_reward = np.mean(rewards_list)
-        mean_relative_diff = np.mean(errors_dict['wspst'])
+        mean_relative_diff = np.mean(list(errors_dict.values())[0])
         self.writer.add_scalar('Eval/Reward per eval', mean_reward, self.evaluation_episodes)
         self.writer.add_scalar('Eval/Reward per episode', mean_reward, self.episode_number)
         # save the best overall model -
         if len(self.best_overall_models) >= 1:
-            print(
-                f"current relative:{mean_relative_diff}, max relative:{max(self.best_overall_models, key=lambda x: x[0])[0]}")
-        if len(self.best_overall_models) < 3 or mean_relative_diff < max(self.best_overall_models, key=lambda x: x[0])[
-            0]:
+            print( f"current relative:{mean_relative_diff},"
+                   f" max relative:{max(self.best_overall_models, key=lambda x: x[0])[0]}")
+        if (len(self.best_overall_models) < 3 or
+                mean_relative_diff < max(self.best_overall_models, key=lambda x: x[0])[0]):
             self.save_model()
             self.best_overall_models.append((mean_relative_diff, self.episode_number))
 
@@ -416,7 +416,7 @@ class PPOAgent:
             checkpoint = torch.load(checkpoint_path)
         else:
             checkpoint = torch.load(checkpoint_path, map_location=torch.device('cpu'))
-        model: PolicyGNN = PolicyGNN(cfg=checkpoint['config']['model_config'])
+        model: PolicyGNN = PolicyGNN(cfg=checkpoint['config']['model_config'], model_name='ppo_policy_model')
         model.load_state_dict(checkpoint['policy'])
         old_model = deepcopy(model)
         old_model.load_state_dict(checkpoint['old_policy'])
