@@ -132,3 +132,9 @@ dmypy.json
 .pyre/
 
 .idea/
+
+
+# training folders
+runs/
+experiments/
+results/

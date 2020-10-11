@@ -5,7 +5,7 @@ from copy import deepcopy
 # mathematical imports
 import networkx as nx
 # our imports
-from src.envs.graph_coloring_simulation import State
+from src.envs.graph_coloring.gc_simulation.simulator import State
 
 
 class ScenarioGenerator(ABC):
@@ -33,12 +33,12 @@ def generate_random_graph(number_of_nodes, probability_of_edge):
     :rtype: (int, list of lists)
     """
 
-    G = nx.fast_gnp_random_graph(number_of_nodes, probability_of_edge, seed=None, directed=False)
+    g = nx.fast_gnp_random_graph(number_of_nodes, probability_of_edge, seed=None, directed=False)
     edges = []
     for i in range(number_of_nodes):
-        temp1 = G.adj[i]
-        edges.append(list(G.adj[i].keys()))
-    return G.number_of_edges(), edges
+        temp1 = g.adj[i]
+        edges.append(list(g.adj[i].keys()))
+    return g.number_of_edges(), edges
 
 
 class FixedGraphGenerator(ScenarioGenerator):
@@ -54,21 +54,29 @@ class FixedGraphGenerator(ScenarioGenerator):
         self.nodes_id = nodes_ids
         self.edge_indexes = edge_indexes
         self.graph = nx.Graph()
+        self.graph.add_nodes_from(self.nodes_id, color=-1, start_time=0)
+        self.graph.add_edges_from(self.edge_indexes)
         # add nodes to graph with the features:
         #   - color : the color of the node (default is -1)
-        #   - visible: if True node is visible at the current time, otherwise False
         #   - open_time: time when node starts to be visible (in offline problem all start_time is 0)
-        [self.graph.add_node(i, attr_dict={"color": -1, "start_time": 0, "visible": True}) for i in self.nodes_id]
-        [self.graph.add_edge(u, v) for (u, v) in self.edge_indexes]
 
     def seed(self, seed: int) -> None:
         pass
 
-    def reset(self) -> State:
+    def next(self, current_state: State) -> State:
+        """
+        this function returns the current state with the updated graph
+        :param current_state: the current cvrp state with the current graph and other important details
+        :return: updated current state with new graph (added nodes and edges)
+        """
+        # in the fixed case, no new nodes are created,
+        # in the online problem - when calling next, more nodes are added to the graph
+        pass
 
+    def reset(self) -> State:
         state = State(unique_colors=set(),
                       graph=deepcopy(self.graph),
                       num_colored_nodes=0,
-                      node_order=[])
+                      nodes_order=[])
         return state
 

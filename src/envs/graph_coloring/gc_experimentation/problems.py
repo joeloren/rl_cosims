@@ -3,17 +3,17 @@ from typing import List
 
 # mathematical imports
 # our imports
-from src.envs.graph_coloring_simulation import FixedGraphGenerator
-from src.envs.graph_coloring_simulation import Simulator
+from src.envs.graph_coloring.gc_simulation.problem_generator import FixedGraphGenerator
+from src.envs.graph_coloring.gc_simulation.simulator import Simulator
 
 
-def create_fixed_static_problem(nodes_ids: List,
-                                edge_indexes: List[tuple]):
+def create_fixed_static_problem(nodes_ids: List, edge_indexes: List[tuple], random_seed=0) -> Simulator:
     """
     Creates a minimal instance with fixed parameters
-    :return:
+    :return: cvrp with fixed problem generator
     """
     problem_generator = FixedGraphGenerator(nodes_ids=nodes_ids, edge_indexes=edge_indexes)
     sim = Simulator(num_max_nodes=len(nodes_ids), problem_generator=problem_generator)
+    sim.seed(random_seed)
     return sim
 

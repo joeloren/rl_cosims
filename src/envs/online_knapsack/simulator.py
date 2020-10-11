@@ -25,7 +25,7 @@ class Simulator(Env):
 
     def __init__(self, max_steps: int, max_capacity: float, problem_generator) -> None:
         """
-        Create a new online_knapsack_simulation. Note that you need to call reset() before starting the simulation.
+        Create a new online_knapsack. Note that you need to call reset() before starting the simulation.
         :param max_steps: max length of episode [int]
         :param problem_generator: a generator of type ScenarioGenerator which generates one instance of the online knapsack
         and returns the initial state of the problem
