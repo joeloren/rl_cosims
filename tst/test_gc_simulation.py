@@ -47,13 +47,16 @@ def test_random_policy():
     env = create_fixed_static_problem(nodes_ids=nodes, edge_indexes=edges)
     obs = env.reset()
     done = False
+    action = random_policy(obs, env)
+    color_chosen = action[1]
+    # make sure that the first color chosen is 0
+    assert color_chosen == 0
     while not done:
         action = random_policy(obs, env)
-        color_chosen = action[1]
-        # # make sure that the first color chosen is 0
-        # assert color_chosen == 0
         next_obs, reward, done, _ = env.step(action)
         obs = next_obs
+
+
 
 
 

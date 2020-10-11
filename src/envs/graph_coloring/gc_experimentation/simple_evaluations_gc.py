@@ -1,6 +1,7 @@
 # basic imports
 import argparse
 import json
+import traceback
 from typing import Callable, Dict
 import os
 import warnings
@@ -37,10 +38,9 @@ def evaluate_policy_simple(problems: Dict[int, Env], policy: Callable[[dict, Env
         mean_reward = evaluate_policy_simple_single_seed(problem, policy, seed, samples_per_seed)
         all_rewards.append(mean_reward)
         if save_solution is not None:
-            ax = plot_gc_solution(graph=problem.current_state.graph, nodes_order=problem.current_state.nodes_order)
-            ax.set_title(f"route for policy:{policy_name}, reward:{-mean_reward:.1f}")
-            plt.pause(0.1)
-            plt.close()
+            plot_gc_solution(graph=problem.current_state.graph, nodes_order=problem.current_state.nodes_order)
+            plt.title(f"graph for policy:{policy_name}, reward:{-mean_reward:.1f}")
+            plt.show()
 
         i += 1
     return all_rewards
@@ -74,9 +74,10 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--policies", type=str, default=[], nargs="+", choices=POLICIES, help="Policies to be tested")
     parser.add_argument("--problem", type=str, default="fixed", choices=PROBLEMS)
+    parser.add_argument("--problem_path", type=str, default="gc_experimentation/saved_problems/fixed/fixed.json")
     parser.add_argument("--start_seed", type=int, default=0)
     parser.add_argument("--num_seeds", type=int, default=20)
-    parser.add_argument("--output_file", type=str, default="experimentation_gc/saved_problems/fixed/results.json")
+    parser.add_argument("--output_file", type=str, default="gc_experimentation/saved_problems/fixed/results.json")
     parser.add_argument("--update_results", action="store_true", help="update the existing json files with new results")
 
     args = parser.parse_args()
