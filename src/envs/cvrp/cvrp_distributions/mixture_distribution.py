@@ -8,7 +8,7 @@ from scipy.stats import rv_continuous
 
 class MixtureModel(rv_continuous):
     """
-    this class creates a mixture of distributions using the scipy random generator library.
+    this class creates a mixture of cvrp_distributions using the scipy random generator library.
     """
 
     def __init__(self, submodels: list, weights: list, a: int, b: int, *args, **kwargs):

@@ -6,10 +6,10 @@ from matplotlib import pyplot as plt
 from ortools.constraint_solver import pywrapcp
 from scipy import stats
 # our imports
-from src.cvrp_simulation.cvrp_baselines import simple_baseline
-from src.cvrp_simulation.plot_results import plot_vehicle_routes
-from src.cvrp_simulation.simulation.scenario_generator import (FixedSample, SampleStaticBenchmark)
-from src.cvrp_simulation.simulation.simulator import CVRPSimulation
+from src.envs.cvrp.cvrp_baselines import simple_baseline
+from src.envs.cvrp.cvrp_utils.plot_results import plot_vehicle_routes
+from src.envs.cvrp.cvrp_simulation.scenario_generator import (FixedSample, SampleStaticBenchmark)
+from src.envs.cvrp.cvrp_simulation.simulator import CVRPSimulation
 
 
 def create_data_model(obs, env, precision=1000):

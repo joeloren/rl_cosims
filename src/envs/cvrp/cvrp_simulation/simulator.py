@@ -1,5 +1,6 @@
 from copy import deepcopy
 from dataclasses import dataclass
+from typing import Dict
 
 import numpy as np
 from gym import Env, spaces
@@ -182,6 +183,12 @@ class CVRPSimulation(Env):
             "current_vehicle_capacity": current_vehicle_capacity,
             "max_vehicle_capacity": max_vehicle_capacity,
         }
+
+    @staticmethod
+    def observation(obs: Dict) -> Dict:
+        # this function returns the observation since the simulator does not change the observation (in future work
+        # might change the observation and then this is needed)
+        return obs
 
     def get_customer_index(self, action_index: int) -> int:
         """

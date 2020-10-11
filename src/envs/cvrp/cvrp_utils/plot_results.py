@@ -1,8 +1,9 @@
 import numpy as np
-from cvrp_simulation.simulation.scenario_generator import SampleStaticBenchmark
-from cvrp_simulation.simulation.simulator import CVRPSimulation
 from matplotlib import pyplot as plt
 from scipy import stats
+# our imports
+from src.envs.cvrp.cvrp_simulation.scenario_generator import SampleStaticBenchmark
+from src.envs.cvrp.cvrp_simulation.simulator import CVRPSimulation
 
 
 def discrete_cmap(n_colors, base_cmap=None):

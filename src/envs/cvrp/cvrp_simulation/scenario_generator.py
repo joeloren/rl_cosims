@@ -5,8 +5,8 @@ from copy import deepcopy
 import numpy as np
 from scipy import stats
 # our imports
-from src.cvrp_simulation.distributions.mixture_distribution import MixtureModel
-from src.cvrp_simulation.simulation.simulator import State
+from src.envs.cvrp.cvrp_distributions.mixture_distribution import MixtureModel
+from src.envs.cvrp.cvrp_simulation.simulator import State
 
 
 class ScenarioGenerator(ABC):
