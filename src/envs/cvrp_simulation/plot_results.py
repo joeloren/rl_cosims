@@ -2,8 +2,8 @@ import numpy as np
 from matplotlib import pyplot as plt
 from scipy import stats
 
-from src.cvrp_simulation import CVRPSimulation
-from src.cvrp_simulation import SampleStaticBenchmark
+from src.envs.cvrp_simulation import CVRPSimulation
+from src.envs.cvrp_simulation import SampleStaticBenchmark
 
 
 def discrete_cmap(N, base_cmap=None):

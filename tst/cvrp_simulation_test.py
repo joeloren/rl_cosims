@@ -1,8 +1,8 @@
 import numpy as np
 import pytest
 
-from src.cvrp_simulation import CVRPSimulation
-from src.cvrp_simulation import FixedSample
+from src.envs.cvrp_simulation import CVRPSimulation
+from src.envs.cvrp_simulation import FixedSample
 
 
 def test_intermediate_states_match_hand_calculated_values():

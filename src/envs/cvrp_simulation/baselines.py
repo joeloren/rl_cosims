@@ -4,9 +4,9 @@ from ortools.constraint_solver import routing_enums_pb2
 from matplotlib import pyplot as plt
 from scipy import stats
 
-from src.cvrp_simulation import CVRPSimulation
-from src.cvrp_simulation import FixedSample, SampleStaticBenchmark
-from src.cvrp_simulation.plot_results import plot_vehicle_routes
+from src.envs.cvrp_simulation import CVRPSimulation
+from src.envs.cvrp_simulation import FixedSample, SampleStaticBenchmark
+from src.envs.cvrp_simulation.plot_results import plot_vehicle_routes
 
 
 def ortools_policy(obs, env, precision=1000, timelimit=10, verbose=False):

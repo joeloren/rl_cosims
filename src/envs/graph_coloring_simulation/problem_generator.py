@@ -3,11 +3,9 @@ from abc import ABC, abstractmethod
 from typing import List
 from copy import deepcopy
 # mathematical imports
-import numpy as np
-from scipy import stats
 import networkx as nx
 # our imports
-from src.graph_coloring_simulation.simulator import State
+from src.envs.graph_coloring_simulation import State
 
 
 class ScenarioGenerator(ABC):
