@@ -102,47 +102,47 @@ def main():
 
     model_config = {
         'n_passes': 4,
-        'edge_embedding_dim': 256,
-        'node_embedding_dim': 256,
-        'global_embedding_dim': 256,
-        'edge_hidden_dim': 256,
-        'edge_target_dim': 256,
-        'node_target_dim': 256,
-        'node_dim_out': 256,
+        'edge_embedding_dim': 128,
+        'node_embedding_dim': 128,
+        'global_embedding_dim': 128,
+        'edge_hidden_dim': 128,
+        'edge_target_dim': 128,
+        'node_target_dim': 128,
+        'node_dim_out': 128,
         'edge_dim_out': 1,
-        'node_hidden_dim': 256,
-        'global_hidden_dim': 256,
-        'global_target_dim': 256,
-        'global_dim_out': 256,
+        'node_hidden_dim': 128,
+        'global_hidden_dim': 128,
+        'global_target_dim': 128,
+        'global_dim_out': 128,
         'edge_feature_dim': 1,
         'node_feature_dim': 4,  # indicator, x, y, demand/capacity
         'global_feature_dim': 1,
-        'value_embedding_dim': 256,
+        'value_embedding_dim': 128,
         'use_value_critic': True,
         'use_batch_norm': False
     }
 
     agent_config = {
-        'lr': 0.001,
-        'discount': 0.95,
+        'lr': 0.0001,
+        'discount': 0.98,
         # number of episodes to do altogether
-        'number_of_episodes': 500000,
+        'number_of_episodes': 50000,
         # a batch is N episodes where N is number_of_episodes_in_batch
-        'number_of_episodes_in_batch': 40,  # this must be a division of number of episodes
+        'number_of_episodes_in_batch': 10,  # this must be a division of number of episodes
         'total_num_eval_seeds': 10,
         'num_eval_seeds': 2,
         'evaluate_every': 50,
         'num_train_seeds': 2,
         'reward_average_window_size': 10,
         'entropy_coeff': 0.01,  # consider decreasing this back
-        'value_coeff': 0.3,
+        'value_coeff': 0.5,
         'minibatch_size': 256,
         'model_config': model_config,
         'save_checkpoint_every': 1000,
-        'eps_clip': 0.4,
-        'n_ppo_updates': 40,
-        'target_kl': 0.02,
-        'logit_normalizer': 20
+        'eps_clip': 0.5,
+        'n_ppo_updates': 20,
+        'target_kl': 0.005,
+        'logit_normalizer': 10
     }
     agent_config['run_name'] = f"ep_in_batch_{agent_config['number_of_episodes_in_batch']}_" \
                                f"n_eval_{agent_config['num_eval_seeds']}_lr_{agent_config['lr']}"
