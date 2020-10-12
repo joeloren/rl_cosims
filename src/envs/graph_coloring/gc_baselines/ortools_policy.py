@@ -79,7 +79,7 @@ def solve_or_tools(nodes: List[int], edges: List[Tuple], max_num_colors: int, ti
     return node_color, graph, found_solution
 
 
-class ORToolsPolicy:
+class ORToolsOfflinePolicy:
     def __init__(self, verbose=False, timeout=10):
         super().__init__()
         self.timeout = timeout
@@ -93,12 +93,13 @@ class ORToolsPolicy:
         # if current time is 0, run problem and save results -
         if obs['current_time'] == 0:
             nodes = list(obs["nodes_id"])
-            edges = obs["edges_index"]
+            edges = obs["edge_indexes"]
             found_solution = False
             num_iters = 0
             for i in range(4, len(nodes)):
                 max_num_colors = i
-                print(f"trying to solve or-tools with maximum colors:{i} , num nodes:{len(nodes)}")
+                if self.verbose:
+                    print(f"trying to solve or-tools with maximum colors:{i} , num nodes:{len(nodes)}")
                 node_colors, graph, found_solution = solve_or_tools(nodes, edges, max_num_colors, timeout=self.timeout)
                 if found_solution:
                     self.graph = graph
@@ -113,8 +114,6 @@ class ORToolsPolicy:
         node_chosen = np.random.choice(available_node_indexes, 1)[0]
         color_chosen = self.node_colors[node_chosen]['color']
         return node_chosen, color_chosen
-
-
 
 
 def main():
@@ -142,9 +141,17 @@ def main():
     node_colors, graph, found_solution = solve_or_tools(nodes=nodes, edges=edges,
                                                         max_num_colors=max_num_colors, timeout=2000)
     plot_gc_solution(graph, [])
-    plt.show()
+    or_tools_policy = ORToolsOfflinePolicy(verbose=True, timeout=1000)
     env = create_fixed_static_problem(nodes, edges, random_seed=0)
     obs = env.reset()
+    done = False
+    while not done:
+        node_chosen, color_chosen = or_tools_policy(obs, env)
+        action = (node_chosen, color_chosen)
+        obs, reward, done, _ = env.step(action)
+    plt.figure()
+    plot_gc_solution(env.current_state.graph, [])
+    plt.show()
 
 
 if __name__ == '__main__':
