@@ -127,7 +127,8 @@ class Simulator(Env):
             'node_colors': node_colors,
             'used_colors': deepcopy(self.current_state.unique_colors),
             'nodes_id': nodes_id,
-            'edge_indexes': list(self.current_state.graph.edges)
+            'edge_indexes': list(self.current_state.graph.edges),
+            'current_time': self.current_time
         }
         return obs
 

@@ -66,7 +66,7 @@ def main():
     use_trains = False
     problem_type = 'uniform_offline'
     max_customer_times = 0
-    size = 10
+    size = 20
     vehicle_velocity = 1
     vehicle_capacity = 30
     random_seed = 0
@@ -123,19 +123,19 @@ def main():
     }
 
     agent_config = {
-        'lr': 0.0001,
+        'lr': 0.001,
         'discount': 0.95,
         # number of episodes to do altogether
         'number_of_episodes': 500000,
         # a batch is N episodes where N is number_of_episodes_in_batch
         'number_of_episodes_in_batch': 40,  # this must be a division of number of episodes
-        'total_num_eval_seeds': 5,
+        'total_num_eval_seeds': 10,
         'num_eval_seeds': 2,
         'evaluate_every': 50,
         'num_train_seeds': 2,
         'reward_average_window_size': 10,
         'entropy_coeff': 0.01,  # consider decreasing this back
-        'value_coeff': 0.5,
+        'value_coeff': 0.3,
         'minibatch_size': 256,
         'model_config': model_config,
         'save_checkpoint_every': 1000,

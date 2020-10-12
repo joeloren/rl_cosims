@@ -1,3 +1,5 @@
+from typing import Dict, List, Tuple
+
 import numpy as np
 import random
 import networkx as nx
@@ -6,9 +8,10 @@ from matplotlib import pyplot as plt
 from ortools.linear_solver import pywraplp
 
 from src.envs.graph_coloring.gc_utils.plot_results import plot_gc_solution
+from src.envs.graph_coloring.gc_simulation.simulator import Simulator
+from src.envs.graph_coloring.gc_experimentation.problems import create_fixed_static_problem
 
-
-def solve_or_tools(graph: nx.Graph, max_num_colors: int, timeout: float=40):
+def solve_or_tools(nodes: List[int], edges: List[Tuple], max_num_colors: int, timeout: float = 40):
     """
     Given an undirected loopless graph G = (V, E), where V is a set of
       nodes, E <= V x V is a set of arcs, the Graph Coloring Problem is to
@@ -20,14 +23,14 @@ def solve_or_tools(graph: nx.Graph, max_num_colors: int, timeout: float=40):
       This model was created by Hakan Kjellerstrand (hakank@gmail.com)
       Also see my other Google CP Solver models:
       http://www.hakank.org/google_or_tools/
-    :param graph:
-    :param max_num_colors:
+    :param nodes: nx graph of problem
+    :param edges:
+    :param max_num_colors: maximum number of colors allowed in graph
+    :param timeout: run time given to algorithm
     :return:
     """
     solver = pywraplp.Solver.CreateSolver('graph_coloring_solver', "CBC")
     solver.set_time_limit(timeout)
-    nodes = list(graph.nodes())
-    edges = list(graph.edges())
     num_nodes = len(nodes)
     # x[i,c] = 1 means that node i is assigned color c
     x = {}
@@ -51,12 +54,17 @@ def solve_or_tools(graph: nx.Graph, max_num_colors: int, timeout: float=40):
     # run solver -
     results_status = solver.Solve()
     node_color = {}
+    graph = nx.Graph()
+    graph.add_nodes_from(nodes, color=-1)
+    graph.add_edges_from(edges)
+    found_solution = False
     if results_status == solver.OPTIMAL:
+        found_solution = True
         num_colors_used = int(solver.Objective().Value())
         print(f'number of colors: {num_colors_used}')
         colors_used = [int(u[i].SolutionValue()) for i in range(max_num_colors)]
         print(f'colors used: {colors_used}')
-        node_color = {n:{} for n in nodes}
+        node_color = {n: {} for n in nodes}
         color_node_mat = np.zeros(shape=(num_nodes, max_num_colors))
         for i in range(num_nodes):
             for j in range(max_num_colors):
@@ -68,7 +76,45 @@ def solve_or_tools(graph: nx.Graph, max_num_colors: int, timeout: float=40):
         print('No solution found.')
     else:
         print("solver could not find optimal solution")
-    return node_color, graph
+    return node_color, graph, found_solution
+
+
+class ORToolsPolicy:
+    def __init__(self, verbose=False, timeout=10):
+        super().__init__()
+        self.timeout = timeout
+        self.verbose = verbose
+        self.__name__ = 'or_tools'
+        self.step = 0
+        self.graph = None
+        self.node_colors = {}
+
+    def __call__(self, obs: Dict, env: Simulator):
+        # if current time is 0, run problem and save results -
+        if obs['current_time'] == 0:
+            nodes = list(obs["nodes_id"])
+            edges = obs["edges_index"]
+            found_solution = False
+            num_iters = 0
+            for i in range(4, len(nodes)):
+                max_num_colors = i
+                print(f"trying to solve or-tools with maximum colors:{i} , num nodes:{len(nodes)}")
+                node_colors, graph, found_solution = solve_or_tools(nodes, edges, max_num_colors, timeout=self.timeout)
+                if found_solution:
+                    self.graph = graph
+                    self.node_colors = node_colors
+                    break
+                num_iters += 1
+            if found_solution is False:
+                raise RuntimeError(f"no solution was found by or tools for the current graph, "
+                                   f"num_iters:{num_iters}, runtime for each try:{self.timeout}")
+
+        available_node_indexes = np.where(obs["node_colors"] == -1)[0]
+        node_chosen = np.random.choice(available_node_indexes, 1)[0]
+        color_chosen = self.node_colors[node_chosen]['color']
+        return node_chosen, color_chosen
+
+
 
 
 def main():
@@ -91,9 +137,14 @@ def main():
     graph = er_graph(n=num_nodes, p=prob_edges)
     node_att_color = {i: {'color': -1} for i in graph.nodes()}
     nx.set_node_attributes(graph, node_att_color)
-    node_colors, graph = solve_or_tools(graph, max_num_colors=max_num_colors, timeout=2000)
+    nodes = list(graph.nodes)
+    edges = list(graph.edges)
+    node_colors, graph, found_solution = solve_or_tools(nodes=nodes, edges=edges,
+                                                        max_num_colors=max_num_colors, timeout=2000)
     plot_gc_solution(graph, [])
     plt.show()
+    env = create_fixed_static_problem(nodes, edges, random_seed=0)
+    obs = env.reset()
 
 
 if __name__ == '__main__':
