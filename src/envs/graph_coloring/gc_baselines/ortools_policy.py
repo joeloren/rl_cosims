@@ -11,7 +11,8 @@ from src.envs.graph_coloring.gc_utils.plot_results import plot_gc_solution
 from src.envs.graph_coloring.gc_simulation.simulator import Simulator
 from src.envs.graph_coloring.gc_experimentation.problems import create_fixed_static_problem
 
-def solve_or_tools(nodes: List[int], edges: List[Tuple], max_num_colors: int, timeout: float = 40):
+
+def solve_or_tools(nodes: List[int], edges: List[Tuple], max_num_colors: int, timeout: float = 40, verbose=False):
     """
     Given an undirected loopless graph G = (V, E), where V is a set of
       nodes, E <= V x V is a set of arcs, the Graph Coloring Problem is to
@@ -61,9 +62,11 @@ def solve_or_tools(nodes: List[int], edges: List[Tuple], max_num_colors: int, ti
     if results_status == solver.OPTIMAL:
         found_solution = True
         num_colors_used = int(solver.Objective().Value())
-        print(f'number of colors: {num_colors_used}')
+        if verbose:
+            print(f'number of colors: {num_colors_used}')
         colors_used = [int(u[i].SolutionValue()) for i in range(max_num_colors)]
-        print(f'colors used: {colors_used}')
+        if verbose:
+            print(f'colors used: {colors_used}')
         node_color = {n: {} for n in nodes}
         color_node_mat = np.zeros(shape=(num_nodes, max_num_colors))
         for i in range(num_nodes):
@@ -73,9 +76,11 @@ def solve_or_tools(nodes: List[int], edges: List[Tuple], max_num_colors: int, ti
             node_color[i]['color'] = color
         nx.set_node_attributes(graph, node_color)
     elif results_status == solver.INFEASIBLE:
-        print('No solution found.')
+        if verbose:
+            print('No solution found.')
     else:
-        print("solver could not find optimal solution")
+        if verbose:
+            print("solver could not find optimal solution")
     return node_color, graph, found_solution
 
 
@@ -88,8 +93,9 @@ class ORToolsOfflinePolicy:
         self.graph = None
         self.node_colors = {}
 
-    def reset(self):
+    def reset(self, obs):
         """
+        :param obs: observation (not used currently)
         this function resets the solution
         :return:
         """
@@ -113,7 +119,7 @@ class ORToolsOfflinePolicy:
                 max_num_colors = i
                 if self.verbose:
                     print(f"trying to solve or-tools with maximum colors:{i} , num nodes:{len(nodes)}")
-                node_colors, graph, found_solution = solve_or_tools(nodes, edges, max_num_colors, timeout=self.timeout)
+                node_colors, graph, found_solution = solve_or_tools(nodes, edges, max_num_colors, timeout=self.timeout, verbose=self.verbose)
                 if found_solution:
                     self.graph = graph
                     self.node_colors = node_colors

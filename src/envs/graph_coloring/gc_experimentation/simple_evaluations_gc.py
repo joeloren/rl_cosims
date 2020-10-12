@@ -15,6 +15,7 @@ from src.envs.graph_coloring.gc_simulation.simulator import Simulator
 from src.envs.graph_coloring.gc_experimentation.problems import create_fixed_static_problem
 from src.envs.graph_coloring.gc_utils.plot_results import plot_gc_solution
 from src.envs.graph_coloring.gc_baselines.simple_policies import random_policy_without_newcolor as random_policy
+from src.envs.graph_coloring.gc_baselines.ortools_policy import ORToolsOfflinePolicy
 
 
 def evaluate_policy_simple(problems: Dict[int, Env], policy: Callable[[dict, Env], np.ndarray], save_solution=True,
@@ -25,6 +26,7 @@ def evaluate_policy_simple(problems: Dict[int, Env], policy: Callable[[dict, Env
     :param save_solution: bool - (True if we want to save the first solution created by policy)
     :param policy: Policy - the policy used to create solution
     :param samples_per_seed: int - the number of times we execute the policy for each seed
+    :param reward_function: str - the reward function chosen
     :return the empirical mean total rewards of the given policy. function returns a list the size of num_seeds
     """
     all_rewards = []
@@ -72,7 +74,7 @@ def evaluate_policy_simple_single_seed(problem: Simulator, policy: Callable[[dic
 
 def main():
     warnings.filterwarnings("ignore")
-    POLICIES = ["simple"]
+    POLICIES = ["simple", "ortools"]
     PROBLEMS = ["fixed", "offline", "online"]
     REWARD_FUNCTIONS = ["sequential", "num_colors"]
     parser = argparse.ArgumentParser()
@@ -103,6 +105,10 @@ def main():
     policies = args.policies
     if "simple" in policies:
         values["Uniformly Random"] = evaluate_policy_simple(envs, random_policy, samples_per_seed=5)
+
+    if "ortools" in policies:
+        ortools_policy = ORToolsOfflinePolicy(verbose=False, timeout=500)  # timeout is in milli-seconds
+        values["OrTools"] = evaluate_policy_simple(envs, ortools_policy, samples_per_seed=5)
 
     expensive_policies = []
     # Run evaluation of specified policies
