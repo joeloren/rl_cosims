@@ -131,4 +131,11 @@ class Simulator(Env):
         }
         return obs
 
-    # def get_allowed_colors(self, current_state):
+    def get_number_of_colors_used(self):
+        """
+        this function returns the number of colors used so far in the graph.
+        this is used to calculate the final reward of the simulation
+        :return: num_colors_used: int - number of colors used in the graph
+        """
+        num_colors_used = len(self.current_state.unique_colors)
+        return num_colors_used

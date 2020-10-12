@@ -18,7 +18,7 @@ from src.envs.graph_coloring.gc_baselines.simple_policies import random_policy_w
 
 
 def evaluate_policy_simple(problems: Dict[int, Env], policy: Callable[[dict, Env], np.ndarray], save_solution=True,
-                           samples_per_seed=100, policy_name=None):
+                           samples_per_seed=100, policy_name=None, reward_function="num_colors"):
     """For num_seeds times, determine the mean policy reward by running it samples_per_seed times.
     :param problems: List[Simulator] - list of gc simulations
     :param policy_name: str - name is used for the plotting title
@@ -35,7 +35,8 @@ def evaluate_policy_simple(problems: Dict[int, Env], policy: Callable[[dict, Env
     for seed, problem in tqdm(problems.items()):
         if i != 0:
             save_solution = False
-        mean_reward = evaluate_policy_simple_single_seed(problem, policy, seed, samples_per_seed)
+        mean_reward = evaluate_policy_simple_single_seed(problem, policy, seed, samples_per_seed,
+                                                         reward_function=reward_function)
         all_rewards.append(mean_reward)
         if save_solution is not None:
             plot_gc_solution(graph=problem.current_state.graph, nodes_order=problem.current_state.nodes_order)
@@ -47,7 +48,7 @@ def evaluate_policy_simple(problems: Dict[int, Env], policy: Callable[[dict, Env
 
 
 def evaluate_policy_simple_single_seed(problem: Simulator, policy: Callable[[dict, Env], np.ndarray], seed: int,
-                                       samples_per_seed: int):
+                                       samples_per_seed: int, reward_function: str):
     total_rewards = []
     for j in range(samples_per_seed):
         problem.seed(seed)
@@ -63,6 +64,8 @@ def evaluate_policy_simple_single_seed(problem: Simulator, policy: Callable[[dic
             action = policy(obs, problem)
             obs, reward, completed, _ = problem.step(action)
             total_reward += reward
+        if reward_function == "num_colors":
+            total_reward = problem.get_number_of_colors_used()
         total_rewards.append(total_reward)
     return np.mean(total_rewards)
 
@@ -71,6 +74,7 @@ def main():
     warnings.filterwarnings("ignore")
     POLICIES = ["simple"]
     PROBLEMS = ["fixed", "offline", "online"]
+    REWARD_FUNCTIONS = ["sequential", "num_colors"]
     parser = argparse.ArgumentParser()
     parser.add_argument("--policies", type=str, default=[], nargs="+", choices=POLICIES, help="Policies to be tested")
     parser.add_argument("--problem", type=str, default="fixed", choices=PROBLEMS)
@@ -79,6 +83,8 @@ def main():
     parser.add_argument("--num_seeds", type=int, default=20)
     parser.add_argument("--output_file", type=str, default="gc_experimentation/saved_problems/fixed/results.json")
     parser.add_argument("--update_results", action="store_true", help="update the existing json files with new results")
+    parser.add_argument("--reward_function", type=str, default="num_colors", choices=REWARD_FUNCTIONS,
+                        help="the reward to use (either sequential reward used for rl or number of colors used")
 
     args = parser.parse_args()
     np.random.seed(seed=args.start_seed)

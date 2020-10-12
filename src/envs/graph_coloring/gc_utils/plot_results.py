@@ -8,10 +8,8 @@ from matplotlib import pyplot as plt
 
 def plot_gc_solution(graph: nx.Graph, nodes_order: List):
     # get unique groups
-    groups = set(nx.get_node_attributes(graph, 'color').values())
-    mapping = dict(zip(sorted(groups), count()))
+    colors = list(nx.get_node_attributes(graph, 'color').values())
     nodes = graph.nodes()
-    colors = [mapping[graph.nodes[n]['color']] for n in nodes]
     # this function should print the full graph solution
     pos = nx.spring_layout(graph)
     ec = nx.draw_networkx_edges(graph, pos, alpha=0.2)
