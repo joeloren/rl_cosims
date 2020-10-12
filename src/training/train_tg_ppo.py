@@ -10,6 +10,7 @@ from trains import Task
 
 # import baseline policy
 from src.envs.cvrp.cvrp_baselines.simple_baseline import distance_proportional_policy
+from src.envs.cvrp.cvrp_baselines.or_tools_baseline import ORToolsPolicy
 # import cvrp simulation -
 from src.envs.cvrp.cvrp_wrappers.cvrp_torch_geometric_wrapper import GeometricBidirectionalWrapper as TgWrapper
 # import problem creator
@@ -148,9 +149,11 @@ def main():
                                f"n_eval_{agent_config['num_eval_seeds']}_lr_{agent_config['lr']}"
     eval_seeds = list(range(agent_config['total_num_eval_seeds']))
     baseline_results_path = Path(EVAL_BASELINES_RESULTS_FILENAME)
+    or_tools_policy = ORToolsPolicy(timeout=10)
     if not baseline_results_path.exists():
         baseline_values = {
             'distance': evaluate_policy_simple(env, eval_seeds, distance_proportional_policy, samples_per_seed=5),
+            'ORTools': evaluate_policy_simple(env, eval_seeds, or_tools_policy, samples_per_seed=5)
         }
         baseline_results_path.parent.mkdir(parents=True, exist_ok=True)
         with open(baseline_results_path, 'w') as f:
