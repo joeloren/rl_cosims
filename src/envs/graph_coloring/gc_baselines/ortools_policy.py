@@ -85,11 +85,24 @@ class ORToolsOfflinePolicy:
         self.timeout = timeout
         self.verbose = verbose
         self.__name__ = 'or_tools'
-        self.step = 0
+        self.graph = None
+        self.node_colors = {}
+
+    def reset(self):
+        """
+        this function resets the solution
+        :return:
+        """
         self.graph = None
         self.node_colors = {}
 
     def __call__(self, obs: Dict, env: Simulator):
+        """
+        this function returns the next node to color and its new color
+        :param obs: observation dictionary from environment
+        :param env: simulation (should not be used here)
+        :return: (node_chosen, color_chosen)
+        """
         # if current time is 0, run problem and save results -
         if obs['current_time'] == 0:
             nodes = list(obs["nodes_id"])
@@ -113,6 +126,12 @@ class ORToolsOfflinePolicy:
         available_node_indexes = np.where(obs["node_colors"] == -1)[0]
         node_chosen = np.random.choice(available_node_indexes, 1)[0]
         color_chosen = self.node_colors[node_chosen]['color']
+        if color_chosen == -1:
+            raise ValueError(f"current time:{obs['current_time']}, "
+                             f"or tools solution did not work, color in solution for chosen node is -1")
+        if obs["node_colors"][node_chosen] != -1:
+            raise ValueError(f"current time:{obs['current_time']}, "
+                             f"node_chosen :{node_chosen}, already has a color:{obs['node_colors'][node_chosen]}")
         return node_chosen, color_chosen
 
 
