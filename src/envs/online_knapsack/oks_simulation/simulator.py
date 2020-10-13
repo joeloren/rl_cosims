@@ -57,7 +57,7 @@ class Simulator(Env):
         super(Simulator, self).render(mode=mode)
 
     def reset(self) -> Dict:
-        self.initial_state = self.problem_generator.reset()
+        self.initial_state.current_item = self.problem_generator.reset()
         self.current_state = deepcopy(self.initial_state)
         self.current_time = 0
         return self.current_state_to_observation()
@@ -70,9 +70,9 @@ class Simulator(Env):
         """
         self.problem_generator.seed(seed)
 
-    def step(self, action_chosen: int) -> (float, int, bool, Dict):
+    def step(self, action_chosen: int) -> (np.array, int, bool, Dict):
         """
-        if the current item is chosen, update the capacity and add the item to the history list
+        add current item to the history list, if the current item is chosen, update the capacity
         """
         self.current_state.item_history.append(self.current_state.current_item)
         if action_chosen == 1:
