@@ -172,7 +172,7 @@ class GeometricBidirectionalWrapper(Wrapper):
         g_tensor = tg.utils.from_networkx(G=g)
         g_tensor.x = torch.tensor(node_features, dtype=torch.float32)
         g_tensor.u = torch.tensor([[0]], dtype=torch.float32)
-        g_tensor.edge_attr = torch.zeros(size=[g_tensor.edge_index.shape[1], 1], dtype=torch.float32)
+        g_tensor.edge_attr = torch.ones(size=[g_tensor.edge_index.shape[1], 1], dtype=torch.float32)
         # get illegal actions from action_mask (action_mask is False if customers demand is beyond current vehicle
         # capacity or if customer is already visited)
         actions_mask = np.zeros(shape=[g_tensor.edge_index.shape[1]])

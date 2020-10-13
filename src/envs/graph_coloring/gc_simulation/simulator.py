@@ -28,16 +28,16 @@ class Simulator(Env):
 
     def __init__(self, num_max_nodes: int, problem_generator) -> None:
         """
-        Create a new graph_coloring. Note that you need to call reset() before starting the cvrp.
-        :param num_nodes: number of nodes in the graph [int]
-        :param problem_generator: a generator of type ScenarioGenerator which generates one instance of the cvrp problem
+        Create a new graph_coloring. Note that you need to call reset() before starting the simulation.
+        :param num_max_nodes: maximum number of nodes in the graph [int]
+        :param problem_generator: a generator of type ScenarioGenerator which generates one instance of the problem
         and returns the initial state of the problem
 
         """
         super().__init__()
         # initial state is empty data variables if self.reset() is not called
         self.initial_state: State = State(unique_colors=set(), graph=nx.Graph(), num_colored_nodes=0, nodes_order=[])
-        # current state of the cvrp, this is updated at every step() call
+        # current state of the simulation, this is updated at every step() call
         self.current_state: State = deepcopy(self.initial_state)
         self.problem_generator = problem_generator  # during reset this will generate a new instance of state
         self.current_time = 0  # a ticker which updates at the end of every step() to the next time step
@@ -51,6 +51,12 @@ class Simulator(Env):
             "nodes_id": spaces.Box(
                 low=0, high=self.num_max_nodes,
                 shape=(self.num_max_nodes,), dtype=np.int32),
+            "edge_indexes": spaces.Box(
+                low=0, high=self.num_max_nodes,
+                shape=(self.num_max_nodes, 2), dtype=np.int32),
+            "current_time": spaces.Box(
+                low=0, high=np.finfo(np.float32).max, shape=(1,), dtype=np.float32
+            ),
             "nodes_color": spaces.Box(
                 low=-1, high=self.num_max_nodes,
                 shape=(self.num_max_nodes,), dtype=np.int32),

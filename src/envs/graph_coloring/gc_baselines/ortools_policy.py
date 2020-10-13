@@ -14,18 +14,19 @@ from src.envs.graph_coloring.gc_experimentation.problems import create_fixed_sta
 
 def solve_or_tools(nodes: List[int], edges: List[Tuple], max_num_colors: int, timeout: float = 40, verbose=False):
     """
-    Given an undirected loopless graph G = (V, E), where V is a set of
+    Given an undirected graph with no loops G = (V, E), where V is a set of
       nodes, E <= V x V is a set of arcs, the Graph Coloring Problem is to
       find a mapping (coloring) F: V -> C, where C = {1, 2, ... } is a set
       of colors whose cardinality is as small as possible, such that
       F(i) != F(j) for every arc (i,j) in E, that is adjacent nodes must
       be assigned different colors.
       '''
-      This model was created by Hakan Kjellerstrand (hakank@gmail.com)
+      This model was created by Hakan (hakank@gmail.com)
       Also see my other Google CP Solver models:
       http://www.hakank.org/google_or_tools/
     :param nodes: nx graph of problem
     :param edges:
+    :param verbose: if True should print logs
     :param max_num_colors: maximum number of colors allowed in graph
     :param timeout: run time given to algorithm
     :return:
@@ -52,6 +53,8 @@ def solve_or_tools(nodes: List[int], edges: List[Tuple], max_num_colors: int, ti
         for c in range(max_num_colors):
             solver.Add(x[e[0], c] + x[e[1], c] <= u[c])
     objective = solver.Minimize(obj)
+    if verbose:
+        print(f"objective is:{objective}")
     # run solver -
     results_status = solver.Solve()
     node_color = {}
@@ -119,7 +122,8 @@ class ORToolsOfflinePolicy:
                 max_num_colors = i
                 if self.verbose:
                     print(f"trying to solve or-tools with maximum colors:{i} , num nodes:{len(nodes)}")
-                node_colors, graph, found_solution = solve_or_tools(nodes, edges, max_num_colors, timeout=self.timeout, verbose=self.verbose)
+                node_colors, graph, found_solution = solve_or_tools(nodes, edges, max_num_colors,
+                                                                    timeout=self.timeout, verbose=self.verbose)
                 if found_solution:
                     self.graph = graph
                     self.node_colors = node_colors

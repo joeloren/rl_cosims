@@ -2,7 +2,7 @@ import numpy as np
 
 from src.envs.graph_coloring.gc_experimentation.problems import create_fixed_static_problem
 from src.envs.graph_coloring.gc_baselines.simple_policies import random_policy
-
+from src.envs.graph_coloring.gc_baselines.ortools_policy import ORToolsOfflinePolicy
 
 def test_fixed_problem():
     # test if reset works
@@ -57,6 +57,16 @@ def test_random_policy():
         obs = next_obs
 
 
+def test_ortools_policy():
+    # test if policy works
+    nodes = [i for i in range(10)]
+    edges = [(u, v) for u in range(5) for v in range(5, 10) if np.random.random() < 0.5]
+    env = create_fixed_static_problem(nodes_ids=nodes, edge_indexes=edges)
+    obs = env.reset()
+    or_tools_policy = ORToolsOfflinePolicy(verbose=True, timeout=100)
+    action = or_tools_policy(obs, env)
+    assert or_tools_policy.graph.nodes()[action[0]]['color'] != -1
+    assert or_tools_policy.graph.nodes()[action[0]]['color'] == action[1]
 
 
 

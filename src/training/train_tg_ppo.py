@@ -125,8 +125,8 @@ def main():
     }
 
     agent_config = {
-        'lr': 0.0001,
-        'discount': 1.0,
+        'lr': 0.005,
+        'discount': 0.95,
         # number of episodes to do altogether
         'number_of_episodes': 50000,
         # a batch is N episodes where N is number_of_episodes_in_batch
@@ -136,8 +136,8 @@ def main():
         'evaluate_every': 50,
         'num_train_seeds': 2,
         'reward_average_window_size': 10,
-        'entropy_coeff': 0.01,  # consider decreasing this back
-        'value_coeff': 0.5,
+        'entropy_coeff': 0.5,  # consider decreasing this back
+        'value_coeff': 0.1,
         'minibatch_size': 256,
         'model_config': model_config,
         'save_checkpoint_every': 1000,
