@@ -13,6 +13,7 @@ from src.envs.cvrp.cvrp_baselines.simple_baseline import distance_proportional_p
 from src.envs.cvrp.cvrp_baselines.or_tools_baseline import ORToolsPolicy
 # import cvrp simulation -
 from src.envs.cvrp.cvrp_wrappers.cvrp_torch_geometric_wrapper import GeometricBidirectionalWrapper as TgWrapper
+from src.envs.cvrp.cvrp_wrappers.cvrp_torch_geometric_wrapper import ObservationNormalizationWrapper as NormWrapper
 # import problem creator
 from src.envs.cvrp.cvrp_experimentation.problems import create_uniform_dynamic_problem
 # import RL algorithm -
@@ -64,7 +65,7 @@ def evaluate_policy_simple_single_seed(problem: Env, policy: Callable[[dict, Env
 
 def main():
     # Init environment
-    use_trains = False
+    use_trains = True
     problem_type = 'uniform_offline'
     max_customer_times = 0
     size = 20
@@ -98,7 +99,7 @@ def main():
     env = create_uniform_dynamic_problem(max_customer_times=max_customer_times, size=size, max_demand=max_demand,
                                          vehicle_velocity=vehicle_velocity, vehicle_capacity=vehicle_capacity,
                                          random_seed=random_seed, start_at_depot=start_at_depot)
-    tg_env = TgWrapper(env)
+    tg_env = TgWrapper(NormWrapper(env))
     tg_env.reset()
 
     model_config = {

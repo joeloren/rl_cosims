@@ -1,10 +1,11 @@
 import itertools
+import scipy.stats as sps
 
 import networkx as nx
 import numpy as np
 import torch
 import torch_geometric as tg
-from gym import Wrapper
+from gym import Wrapper, ObservationWrapper
 
 
 class GeometricWrapper(Wrapper):
@@ -204,3 +205,50 @@ class GeometricBidirectionalWrapper(Wrapper):
         tg_obs = self.obs_to_graph_dict(next_state)
         return tg_obs, reward, done, {}
 
+
+class ObservationNormalizationWrapper(ObservationWrapper):
+
+    def __init__(self, env):
+        super().__init__(env)
+        self.data_to_normalize = [
+            "customer_positions",
+            "customer_demands",
+            "depot_position",
+            "current_vehicle_position",
+            "current_vehicle_capacity"
+        ]
+
+    def reset(self):
+        obs = self.env.reset()
+        return self.observation(obs)
+
+    def observation(self, obs):
+        for k, v in obs.items():
+            # Normalize all Box space observations
+            if k in self.data_to_normalize:
+                low_mean = np.mean(self.observation_space[k].low).item()
+                high_mean = np.mean(self.observation_space[k].high).item()
+                obs[k] = self.mean_std_transform(
+                    v, low_mean, high_mean)
+
+        return obs
+
+    @staticmethod
+    def mean_std_transform(value, lower, upper):
+        mean, var = sps.uniform.stats(loc=lower, scale=upper - lower, moments="mv")
+        std = np.sqrt(var) + 1e-8
+
+        value = value - mean
+        value = value / std
+
+        return value
+
+    @staticmethod
+    def mean_std_inverse(value, lower, upper):
+        mean, var = sps.uniform.stats(loc=lower, scale=upper - lower, moments="mv")
+        std = np.sqrt(var) + 1e-8
+
+        value = value * std
+        value = value + mean
+
+        return value
