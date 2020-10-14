@@ -39,6 +39,8 @@ class Simulator(Env):
         self.current_state: State = deepcopy(self.initial_state)
         self.problem_generator = problem_generator  # during reset this will generate a new distribution over items
         self.current_time = 0  # a ticker which updates at the end of every step() to the next time step
+        self.observation_indices = {'time ratio': 0, 'capacity ratio': 1, 'value': 2, 'cost': 3}
+        self.item_indices = {'value': 0, 'cost': 1}
         obs_spaces = {
             "item_obs": spaces.Box(
                 low=0, high=1,
@@ -74,10 +76,10 @@ class Simulator(Env):
         """
         add current item to the history list, if the current item is chosen, update the capacity
         """
-        self.current_state.item_history.append(self.current_state.current_item)
+        self.current_state.item_history.append({'item': self.current_state.current_item, 'action': action_chosen})
         if action_chosen == 1:
-            self.current_state.current_capacity += self.current_state.current_item[1]
-            reward = self.current_state.current_item[0]
+            self.current_state.current_capacity += self.current_state.current_item[self.item_indices['cost']]
+            reward = self.current_state.current_item[self.item_indices['value']]
         else:
             reward = 0.0
         self.current_state.current_item = self.problem_generator.sample_item()
@@ -103,7 +105,11 @@ class Simulator(Env):
         capacity_ratio = float(self.current_state.current_capacity) / float(self.current_state.max_capacity)
         value = self.current_state.current_item[0]
         cost = self.current_state.current_item[1]
-        item_obs = np.array([time_ratio, capacity_ratio, value, cost])
+        item_obs = np.zeros(len(self.observation_indices))
+        item_obs[self.observation_indices['time ratio']] = time_ratio
+        item_obs[self.observation_indices['capacity ratio']] = capacity_ratio
+        item_obs[self.observation_indices['value']] = value
+        item_obs[self.observation_indices['cost']] = cost
         obs = {'item_obs': item_obs}
         return obs
 

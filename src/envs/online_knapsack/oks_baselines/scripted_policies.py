@@ -24,7 +24,7 @@ def simple_policy(obs, env: Simulator) -> int:
     :return: action: int - a binary action if the item is taken or not
     """
     num = np.random.rand()
-    if obs['item_obs'][2] > obs['item_obs'][3]:
+    if obs['item_obs'][env.observation_indices['value']] > obs['item_obs'][env.observation_indices['cost']]:
         return 1
     else:
         return 0
