@@ -77,13 +77,15 @@ class Simulator(Env):
         add current item to the history list, if the current item is chosen, update the capacity
         """
         self.current_state.item_history.append({'item': self.current_state.current_item, 'action': action_chosen})
-        if action_chosen == 1:
+        reward = 0
+        if (action_chosen == 1) and (self.current_state.current_capacity +
+                                     self.current_state.current_item[self.item_indices['cost']]
+                                     <= self.current_state.max_capacity):
             self.current_state.current_capacity += self.current_state.current_item[self.item_indices['cost']]
             reward = self.current_state.current_item[self.item_indices['value']]
-        else:
-            reward = 0.0
         self.current_state.current_item = self.problem_generator.sample_item()
         is_done = self.calc_is_done()
+        self.current_state.num_steps_taken += 1
         self.current_time += 1
         return self.current_state_to_observation(), reward, is_done, {}
 
