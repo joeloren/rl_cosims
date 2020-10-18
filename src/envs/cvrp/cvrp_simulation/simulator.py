@@ -233,9 +233,7 @@ class CVRPSimulation(Env):
                 customer_index = self.DEPOT_INDEX  # depot is chosen
         return customer_index
 
-    def reset_future(
-            self, seed: int, horizon_limit: int = None, n_future_customers: int = 3
-    ) -> Env:
+    def reset_future(self, seed: int, horizon_limit: int = None, n_future_customers: int = 3) -> Env:
         """
         this function copies the current environment and in the new environment takes all customers that are not yet
         opened and updates their time, position and demand. this is used for heuristics that preform rollouts and
