@@ -10,10 +10,12 @@ from trains import Task
 
 # import baseline policy
 from src.envs.cvrp.cvrp_baselines.simple_baseline import distance_proportional_policy
+from src.envs.cvrp.cvrp_baselines.or_tools_baseline import ORToolsPolicy
 # import cvrp simulation -
 from src.envs.cvrp.cvrp_wrappers.cvrp_torch_geometric_wrapper import GeometricBidirectionalWrapper as TgWrapper
+from src.envs.cvrp.cvrp_wrappers.cvrp_torch_geometric_wrapper import ObservationNormalizationWrapper as NormWrapper
 # import problem creator
-from src.envs.cvrp.cvrp_experimentation.problems import create_uniform_dynamic_problem
+from src.envs.cvrp.cvrp_experimentation.problems import (create_uniform_dynamic_problem, create_fixed_static_problem)
 # import RL algorithm -
 from src.agents.tg_ppo_agent import PPOAgent
 from src.models.tg_models import PolicyGNN as PolicyModel
@@ -63,10 +65,10 @@ def evaluate_policy_simple_single_seed(problem: Env, policy: Callable[[dict, Env
 
 def main():
     # Init environment
-    use_trains = False
+    use_trains = True
     problem_type = 'uniform_offline'
     max_customer_times = 0
-    size = 10
+    size = 20
     vehicle_velocity = 1
     vehicle_capacity = 30
     random_seed = 0
@@ -97,27 +99,48 @@ def main():
     env = create_uniform_dynamic_problem(max_customer_times=max_customer_times, size=size, max_demand=max_demand,
                                          vehicle_velocity=vehicle_velocity, vehicle_capacity=vehicle_capacity,
                                          random_seed=random_seed, start_at_depot=start_at_depot)
+
+    # customer_positions = [[0.25, 0.25], [0.5, 0.5], [1, 1]]
+    # env = create_fixed_static_problem(customer_positions=customer_positions,
+    #                                   depot_position=[0, 0],
+    #                                   initial_vehicle_capacity=10,
+    #                                   initial_vehicle_position=[0, 0],
+    #                                   customer_demands=[1]*len(customer_positions),
+    #                                   customer_times=[0]*len(customer_positions),
+    #                                   vehicle_velocity=1)
+    #
+    # env_config = {'problem_type': 'fixed_problem',
+    #               'size': 3,
+    #               'vehicle_capacity': 10,
+    #               'vehicle_position': [0,0],
+    #               'customer_positions':customer_positions,
+    #               'start_at_depot': True
+    #               }
+    # EVAL_BASELINES_RESULTS_FILENAME = (f'experiments/{3}s_{10}c_{0}t/'
+    #                                    f'baseline_values.json')
+
+
     tg_env = TgWrapper(env)
     tg_env.reset()
 
     model_config = {
         'n_passes': 4,
-        'edge_embedding_dim': 256,
-        'node_embedding_dim': 256,
-        'global_embedding_dim': 256,
-        'edge_hidden_dim': 256,
-        'edge_target_dim': 256,
-        'node_target_dim': 256,
-        'node_dim_out': 256,
+        'edge_embedding_dim': 128,
+        'node_embedding_dim': 128,
+        'global_embedding_dim': 128,
+        'edge_hidden_dim': 128,
+        'edge_target_dim': 128,
+        'node_target_dim': 128,
+        'node_dim_out': 128,
         'edge_dim_out': 1,
-        'node_hidden_dim': 256,
-        'global_hidden_dim': 256,
-        'global_target_dim': 256,
-        'global_dim_out': 256,
+        'node_hidden_dim': 128,
+        'global_hidden_dim': 128,
+        'global_target_dim': 128,
+        'global_dim_out': 128,
         'edge_feature_dim': 1,
         'node_feature_dim': 4,  # indicator, x, y, demand/capacity
         'global_feature_dim': 1,
-        'value_embedding_dim': 256,
+        'value_embedding_dim': 128,
         'use_value_critic': True,
         'use_batch_norm': False
     }
@@ -126,31 +149,33 @@ def main():
         'lr': 0.0001,
         'discount': 0.95,
         # number of episodes to do altogether
-        'number_of_episodes': 500000,
+        'number_of_episodes': 50000,
         # a batch is N episodes where N is number_of_episodes_in_batch
-        'number_of_episodes_in_batch': 40,  # this must be a division of number of episodes
-        'total_num_eval_seeds': 5,
+        'number_of_episodes_in_batch': 20,  # this must be a division of number of episodes
+        'total_num_eval_seeds': 10,
         'num_eval_seeds': 2,
         'evaluate_every': 50,
         'num_train_seeds': 2,
         'reward_average_window_size': 10,
         'entropy_coeff': 0.01,  # consider decreasing this back
-        'value_coeff': 0.5,
+        'value_coeff': 0.3,
         'minibatch_size': 256,
         'model_config': model_config,
         'save_checkpoint_every': 1000,
-        'eps_clip': 0.4,
-        'n_ppo_updates': 40,
-        'target_kl': 0.02,
-        'logit_normalizer': 20
+        'eps_clip': 0.5,
+        'n_ppo_updates': 20,
+        'target_kl': 0.005,
+        'logit_normalizer': 10
     }
     agent_config['run_name'] = f"ep_in_batch_{agent_config['number_of_episodes_in_batch']}_" \
                                f"n_eval_{agent_config['num_eval_seeds']}_lr_{agent_config['lr']}"
     eval_seeds = list(range(agent_config['total_num_eval_seeds']))
     baseline_results_path = Path(EVAL_BASELINES_RESULTS_FILENAME)
+    or_tools_policy = ORToolsPolicy(timeout=10)
     if not baseline_results_path.exists():
         baseline_values = {
             'distance': evaluate_policy_simple(env, eval_seeds, distance_proportional_policy, samples_per_seed=5),
+            'ORTools': evaluate_policy_simple(env, eval_seeds, or_tools_policy, samples_per_seed=5)
         }
         baseline_results_path.parent.mkdir(parents=True, exist_ok=True)
         with open(baseline_results_path, 'w') as f:

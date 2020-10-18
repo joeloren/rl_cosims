@@ -56,7 +56,7 @@ class PPOAgent:
         self.episode_step_number = 0
         self.episode_number = 0
         self.episode_number_in_batch = 0
-        self.reward_normalizer = 10e3
+        self.reward_normalizer = 1
         # lr scheduler for changing the lr during training.
         self.lr_scheduler = ReduceLROnPlateau(
             optimizer=self.optimizer,

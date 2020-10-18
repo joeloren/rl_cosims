@@ -66,8 +66,10 @@ class CVRPSimulation(Env):
             "action_mask": spaces.MultiBinary(self.max_customers + 2),
             "depot_position": spaces.Box(low=0, high=1, shape=(2,), dtype=np.float32),
             "current_vehicle_position": spaces.Box(low=0, high=1, shape=(2,), dtype=np.float32),
-            "current_vehicle_capacity": spaces.Discrete(n=self.max_customers * 20),
-            "max_vehicle_capacity": spaces.Discrete(n=self.max_customers * 20),
+            "current_vehicle_capacity": spaces.Box(low=0, high=self.problem_generator.vehicle_capacity, shape=(1,),
+                                                   dtype=np.float32),
+            "max_vehicle_capacity": spaces.Box(low=0, high=self.problem_generator.vehicle_capacity, shape=(1,),
+                                               dtype=np.float32),
         }
         self.observation_space = spaces.Dict(obs_spaces)
 
@@ -231,9 +233,7 @@ class CVRPSimulation(Env):
                 customer_index = self.DEPOT_INDEX  # depot is chosen
         return customer_index
 
-    def reset_future(
-        self, seed: int, horizon_limit: int = None, n_future_customers: int = 3
-    ) -> Env:
+    def reset_future(self, seed: int, horizon_limit: int = None, n_future_customers: int = 3) -> Env:
         """
         this function copies the current environment and in the new environment takes all customers that are not yet
         opened and updates their time, position and demand. this is used for heuristics that preform rollouts and
