@@ -110,6 +110,7 @@ class Simulator(Env):
         reward = len(self.current_state.unique_colors)
         is_done = self.calc_is_done()
         self.current_time += 1
+        self.problem_generator.next(self.current_state)
         return self.current_state_to_observation(), reward, is_done, {}
 
     def calc_is_done(self):

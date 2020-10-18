@@ -2,7 +2,9 @@
 from abc import ABC, abstractmethod
 from typing import List
 from copy import deepcopy
+import random
 # mathematical imports
+import numpy as np
 import networkx as nx
 # our imports
 from src.envs.graph_coloring.gc_simulation.simulator import State
@@ -45,7 +47,7 @@ class FixedGraphGenerator(ScenarioGenerator):
     """
     this class creates a problem generator that always returns the same initial graph
     """
-    def __init__(self, nodes_ids: List, edge_indexes: List):
+    def __init__(self, nodes_ids: List, edge_indexes: List, *kwargs):
         """
         initialize the class with the variables that create the graph
         :param nodes_ids: nodes iid (this is used as the identifier for the node, each node has a unique id)
@@ -80,3 +82,47 @@ class FixedGraphGenerator(ScenarioGenerator):
                       nodes_order=[])
         return state
 
+
+class ERGraphGenerator(ScenarioGenerator):
+    """
+    this class creates a problem generator that returns Erdos-Renyi graph (there are N nodes and probability P for
+    having an edge E(i, j) between N_i and N_j)
+    """
+    def __init__(self, num_nodes: int, prob_edge: float, is_online: bool = False, seed: float = 0):
+        """
+        initialize the class with the variables that create the graph
+        :param num_nodes: int , number of initial nodes in the graph
+        :param prob_edge: float, probability if there exists an edge E(i, j) between two nodes
+        :param is_online: bool, define if problem is the online (True) or offline problem (False)
+        """
+        # save input to class -
+        self.num_nodes = num_nodes
+        self.prob_edge = prob_edge
+        self.prob_new_node = prob_new_node
+        # create random graph -
+        self.graph = nx.fast_gnp_random_graph(num_nodes, prob_edge, seed=seed, directed=False)
+        # add features to nodes in graph -
+        #   - color : the color of the node (default is -1)
+        #   - open_time: time when node starts to be visible (in offline problem all start_time is 0)
+        att = {i: {'color': -1, 'start_time': 0} for i in range(num_nodes)}
+        nx.set_node_attributes(self.graph, att)
+
+    def seed(self, seed: int) -> None:
+        np.seed(seed)
+        random.seed(seed)
+
+    def next(self, current_state: State) -> State:
+        """
+        this function returns the current state with the updated graph
+        :param current_state: the current cvrp state with the current graph and other important details
+        :return: updated current state with new graph (added nodes and edges)
+        """
+        if np.random.random() > self.prob_new_node:
+            pass
+
+    def reset(self) -> State:
+        state = State(unique_colors=set(),
+                      graph=deepcopy(self.graph),
+                      num_colored_nodes=0,
+                      nodes_order=[])
+        return state
