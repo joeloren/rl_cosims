@@ -65,27 +65,27 @@ def evaluate_policy_simple_single_seed(problem: Env, policy: Callable[[dict, Env
 
 def main():
     # Init environment
-    use_trains = False
-    # problem_type = 'uniform_offline'
-    # max_customer_times = 0
-    # size = 20
-    # vehicle_velocity = 1
-    # vehicle_capacity = 30
-    # random_seed = 0
-    # max_demand = 10
-    # start_at_depot = True
-    # EVAL_BASELINES_RESULTS_FILENAME = (f'experiments/{size}s_{vehicle_capacity}c_{max_customer_times}t/'
-    #                                    f'baseline_values.json')
+    use_trains = True
+    problem_type = 'uniform_offline'
+    max_customer_times = 0
+    size = 20
+    vehicle_velocity = 1
+    vehicle_capacity = 30
+    random_seed = 0
+    max_demand = 10
+    start_at_depot = True
+    EVAL_BASELINES_RESULTS_FILENAME = (f'experiments/{size}s_{vehicle_capacity}c_{max_customer_times}t/'
+                                       f'baseline_values.json')
 
-    # env_config = {'problem_type': problem_type,
-    #               'max_customer_times': max_customer_times,
-    #               'size': size,
-    #               'max_demand': max_demand,
-    #               'vehicle_velocity': vehicle_velocity,
-    #               'vehicle_capacity': vehicle_capacity,
-    #               'start_at_depot': start_at_depot,
-    #               'random_seed': random_seed,
-    #               'eval_baseline_results_filename': EVAL_BASELINES_RESULTS_FILENAME}
+    env_config = {'problem_type': problem_type,
+                  'max_customer_times': max_customer_times,
+                  'size': size,
+                  'max_demand': max_demand,
+                  'vehicle_velocity': vehicle_velocity,
+                  'vehicle_capacity': vehicle_capacity,
+                  'start_at_depot': start_at_depot,
+                  'random_seed': random_seed,
+                  'eval_baseline_results_filename': EVAL_BASELINES_RESULTS_FILENAME}
     if use_trains:
         task = Task.init(
             project_name="train_cvrp_pytorch",
@@ -96,28 +96,28 @@ def main():
     else:
         logger = None
 
-    # env = create_uniform_dynamic_problem(max_customer_times=max_customer_times, size=size, max_demand=max_demand,
-    #                                      vehicle_velocity=vehicle_velocity, vehicle_capacity=vehicle_capacity,
-    #                                      random_seed=random_seed, start_at_depot=start_at_depot)
+    env = create_uniform_dynamic_problem(max_customer_times=max_customer_times, size=size, max_demand=max_demand,
+                                         vehicle_velocity=vehicle_velocity, vehicle_capacity=vehicle_capacity,
+                                         random_seed=random_seed, start_at_depot=start_at_depot)
 
-    customer_positions = [[0.25, 0.25], [0.5, 0.5], [1, 1]]
-    env = create_fixed_static_problem(customer_positions=customer_positions,
-                                      depot_position=[0, 0],
-                                      initial_vehicle_capacity=10,
-                                      initial_vehicle_position=[0, 0],
-                                      customer_demands=[1]*len(customer_positions),
-                                      customer_times=[0]*len(customer_positions),
-                                      vehicle_velocity=1)
-
-    env_config = {'problem_type': 'fixed_problem',
-                  'size': 3,
-                  'vehicle_capacity': 10,
-                  'vehicle_position': [0,0],
-                  'customer_positions':customer_positions,
-                  'start_at_depot': True
-                  }
-    EVAL_BASELINES_RESULTS_FILENAME = (f'experiments/{3}s_{10}c_{0}t/'
-                                       f'baseline_values.json')
+    # customer_positions = [[0.25, 0.25], [0.5, 0.5], [1, 1]]
+    # env = create_fixed_static_problem(customer_positions=customer_positions,
+    #                                   depot_position=[0, 0],
+    #                                   initial_vehicle_capacity=10,
+    #                                   initial_vehicle_position=[0, 0],
+    #                                   customer_demands=[1]*len(customer_positions),
+    #                                   customer_times=[0]*len(customer_positions),
+    #                                   vehicle_velocity=1)
+    #
+    # env_config = {'problem_type': 'fixed_problem',
+    #               'size': 3,
+    #               'vehicle_capacity': 10,
+    #               'vehicle_position': [0,0],
+    #               'customer_positions':customer_positions,
+    #               'start_at_depot': True
+    #               }
+    # EVAL_BASELINES_RESULTS_FILENAME = (f'experiments/{3}s_{10}c_{0}t/'
+    #                                    f'baseline_values.json')
 
 
     tg_env = TgWrapper(env)
@@ -146,19 +146,19 @@ def main():
     }
 
     agent_config = {
-        'lr': 0.005,
+        'lr': 0.0001,
         'discount': 0.95,
         # number of episodes to do altogether
         'number_of_episodes': 50000,
         # a batch is N episodes where N is number_of_episodes_in_batch
-        'number_of_episodes_in_batch': 10,  # this must be a division of number of episodes
+        'number_of_episodes_in_batch': 20,  # this must be a division of number of episodes
         'total_num_eval_seeds': 10,
         'num_eval_seeds': 2,
         'evaluate_every': 50,
         'num_train_seeds': 2,
         'reward_average_window_size': 10,
-        'entropy_coeff': 0.5,  # consider decreasing this back
-        'value_coeff': 0.1,
+        'entropy_coeff': 0.01,  # consider decreasing this back
+        'value_coeff': 0.3,
         'minibatch_size': 256,
         'model_config': model_config,
         'save_checkpoint_every': 1000,
