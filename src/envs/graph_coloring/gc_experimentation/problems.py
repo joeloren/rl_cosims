@@ -32,7 +32,11 @@ def create_er_random_graph_problem(num_new_nodes: int, num_initial_nodes: int, p
     """
     problem_generator = ERGraphGenerator(num_nodes=num_initial_nodes, prob_edge=prob_edge,
                                          is_online=is_online, seed=random_seed)
+    if is_online:
+        max_run_time = num_new_nodes
+    else:
+        max_run_time = num_initial_nodes
     sim = Simulator(num_max_nodes=num_initial_nodes + num_new_nodes, problem_generator=problem_generator,
-                    max_time_steps=num_new_nodes)
+                    max_time_steps=max_run_time)
     sim.seed(random_seed)
     return sim

@@ -12,7 +12,8 @@ from gym import Env
 from matplotlib import pyplot as plt
 # our imports
 from src.envs.graph_coloring.gc_simulation.simulator import Simulator
-from src.envs.graph_coloring.gc_experimentation.problems import create_fixed_static_problem
+from src.envs.graph_coloring.gc_experimentation.problems import (create_fixed_static_problem,
+                                                                 create_er_random_graph_problem)
 from src.envs.graph_coloring.gc_utils.plot_results import plot_gc_solution
 from src.envs.graph_coloring.gc_baselines.simple_policies import random_policy_without_newcolor as random_policy
 from src.envs.graph_coloring.gc_baselines.ortools_policy import ORToolsOfflinePolicy
@@ -75,7 +76,7 @@ def evaluate_policy_simple_single_seed(problem: Simulator, policy: Callable[[dic
 def main():
     warnings.filterwarnings("ignore")
     POLICIES = ["simple", "ortools"]
-    PROBLEMS = ["fixed", "offline", "online"]
+    PROBLEMS = ["fixed", "er_random"]
     REWARD_FUNCTIONS = ["sequential", "num_colors"]
     parser = argparse.ArgumentParser()
     parser.add_argument("--policies", type=str, default=[], nargs="+", choices=POLICIES, help="Policies to be tested")
@@ -98,6 +99,11 @@ def main():
     if args.problem == "fixed":
         envs = {
             args.start_seed + seed: create_fixed_static_problem(**problem_params, random_seed=args.start_seed + seed)
+            for seed in range(args.num_seeds)
+        }
+    elif args.problem == "er_random":
+        envs = {
+            args.start_seed + seed: create_er_random_graph_problem(**problem_params, random_seed=args.start_seed + seed)
             for seed in range(args.num_seeds)
         }
     print("running evaluation code")
