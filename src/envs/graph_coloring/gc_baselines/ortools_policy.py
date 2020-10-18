@@ -31,7 +31,7 @@ def solve_or_tools(nodes: List[int], edges: List[Tuple], max_num_colors: int, ti
     :param timeout: run time given to algorithm
     :return:
     """
-    solver = pywraplp.Solver.CreateSolver('graph_coloring_solver', "CBC")
+    solver = pywraplp.Solver.CreateSolver("CBC")
     solver.set_time_limit(timeout)
     num_nodes = len(nodes)
     # x[i,c] = 1 means that node i is assigned color c
@@ -118,7 +118,7 @@ class ORToolsOfflinePolicy:
             edges = obs["edge_indexes"]
             found_solution = False
             num_iters = 0
-            for i in range(4, len(nodes)):
+            for i in range(np.min([len(nodes), 4]), len(nodes)+1):
                 max_num_colors = i
                 if self.verbose:
                     print(f"trying to solve or-tools with maximum colors:{i} , num nodes:{len(nodes)}")
