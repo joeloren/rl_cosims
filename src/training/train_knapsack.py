@@ -25,3 +25,7 @@ def main():
     ac_kwargs = dict(hidden_sizes=[args.hid]*args.l)
     ppo(env_fn=env_generator, actor_critic=MLPActorCritic, ac_kwargs=ac_kwargs, gamma=args.gamma, seed=args.seed,
         steps_per_epoch=args.steps, epochs=args.epochs, logger_kwargs=logger_kwargs)
+
+
+if __name__ == "__main__":
+    main()
