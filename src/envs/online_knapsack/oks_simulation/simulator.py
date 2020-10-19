@@ -47,6 +47,7 @@ class Simulator(Env):
                 shape=(4,), dtype=np.float32)
         }
         self.observation_space = spaces.Dict(obs_spaces)
+        self.action_space = spaces.Discrete(2)
 
     def render(self, mode="human", close=False) -> None:
         """
