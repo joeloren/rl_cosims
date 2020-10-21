@@ -128,6 +128,8 @@ class Simulator(Env):
         """
         nodes_id = np.array(self.current_state.graph.nodes)
         colors = nx.get_node_attributes(self.current_state.graph, 'color')
+        positions = self.current_state.graph.nodes('pos')
+        node_positions = [positions[i] for i in nodes_id]
         start_times = nx.get_node_attributes(self.current_state.graph, 'start_time')
         node_colors = np.array([colors[i] for i in nodes_id])
         node_start_times = np.array([start_times[i] for i in nodes_id])
@@ -137,7 +139,8 @@ class Simulator(Env):
             'nodes_id': nodes_id,
             'edge_indexes': list(self.current_state.graph.edges),
             'current_time': self.current_time,
-            'nodes_start_time': node_start_times
+            'nodes_start_time': node_start_times,
+            'node_positions': node_positions
         }
         return obs
 

@@ -38,9 +38,13 @@ class FixedGraphGenerator(ScenarioGenerator):
         self.graph = nx.Graph()
         self.graph.add_nodes_from(self.nodes_id, color=-1, start_time=0)
         self.graph.add_edges_from(self.edge_indexes)
+        pos = nx.spring_layout(self.graph)
+        att = {i: {'pos': p} for i, p in pos.items()}
+        nx.set_node_attributes(self.graph, att)
         # add nodes to graph with the features:
         #   - color : the color of the node (default is -1)
         #   - open_time: time when node starts to be visible (in offline problem all start_time is 0)
+        #   - pos : position of nodes, used for drawing graph
 
     def seed(self, seed: int) -> None:
         pass
@@ -88,7 +92,9 @@ class ERGraphGenerator(ScenarioGenerator):
         # add features to nodes in graph -
         #   - color : the color of the node (default is -1)
         #   - open_time: time when node starts to be visible (in offline problem all start_time is 0)
-        att = {i: {'color': -1, 'start_time': 0} for i in range(self.num_initial_nodes)}
+        #   - pos: position of node, used for visualization
+        pos = nx.spring_layout(graph)
+        att = {i: {'color': -1, 'start_time': 0, 'pos': p} for i, p in pos.items()}
         nx.set_node_attributes(graph, att)
         return graph
 
@@ -105,7 +111,8 @@ class ERGraphGenerator(ScenarioGenerator):
         if self.is_online:
             num_node_to_add = len(current_state.graph.nodes())
             # add new node to graph with time = current_time and no color
-            current_state.graph.add_node(num_node_to_add, color=-1, start_time=current_state.current_time)
+            current_state.graph.add_node(num_node_to_add, color=-1, start_time=current_state.current_time,
+                                         pos=np.array([np.random.uniform(-1, 1, 1), np.random.uniform(-1, 1, 1)]))
             # go over all other nodes and graph and see if edge needs to be added
             for n in current_state.graph.nodes():
                 if np.random.random() > self.prob_edge:
