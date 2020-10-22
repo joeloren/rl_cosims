@@ -27,6 +27,11 @@ class Simulator(Env):
     EPSILON_TIME = 1e-6
     metadata = {"render.modes": ["human"]}
 
+    @staticmethod
+    def observation(obs):
+        # the simulator returns obs without any changes (used for wrappers)
+        return obs
+
     def __init__(self, num_max_nodes: int, max_time_steps: int, problem_generator) -> None:
         """
         Create a new graph_coloring. Note that you need to call reset() before starting the simulation.
