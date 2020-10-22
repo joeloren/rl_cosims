@@ -106,7 +106,7 @@ class Simulator(Env):
             self.current_state.unique_colors.add(color_chosen)
         self.current_state.num_colored_nodes += 1
         self.current_state.nodes_order.append(node_chosen)
-        reward = len(self.current_state.unique_colors)
+        reward = -len(self.current_state.unique_colors)
         is_done = self.calc_is_done()
         self.current_time += 1
         self.current_state.current_time = self.current_time

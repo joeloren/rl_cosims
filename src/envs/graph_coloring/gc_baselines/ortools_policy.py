@@ -58,7 +58,7 @@ def solve_or_tools(nodes: List[int], edges: List[Tuple], max_num_colors: int, ti
     # run solver -
     results_status = solver.Solve()
     node_color = {}
-    graph = nx.Graph()
+    graph = nx.DiGraph()
     graph.add_nodes_from(nodes, color=-1)
     graph.add_edges_from(edges)
     found_solution = False
@@ -162,14 +162,14 @@ def main():
     num_nodes = 20
     prob_edges = 0.3
     max_num_colors = 10
-    graph = er_graph(n=num_nodes, p=prob_edges)
-    node_att_color = {i: {'color': -1} for i in graph.nodes()}
-    nx.set_node_attributes(graph, node_att_color)
+    graph = er_graph(n=num_nodes, p=prob_edges, directed=True)
+    pos = nx.spring_layout(graph)
+    att = {i: {'color': -1, 'start_time': 0, 'pos': p} for i, p in pos.items()}
+    nx.set_node_attributes(graph, att)
     nodes = list(graph.nodes)
     edges = list(graph.edges)
     node_colors, graph, found_solution = solve_or_tools(nodes=nodes, edges=edges,
                                                         max_num_colors=max_num_colors, timeout=2000)
-    plot_gc_solution(graph, [])
     or_tools_policy = ORToolsOfflinePolicy(verbose=True, timeout=1000)
     env = create_fixed_static_problem(nodes, edges, random_seed=0)
     obs = env.reset()

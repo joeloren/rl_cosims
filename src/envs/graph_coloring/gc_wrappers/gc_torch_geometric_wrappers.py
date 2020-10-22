@@ -8,6 +8,7 @@ import torch
 import torch_geometric as tg
 from gym import Wrapper
 # our imports
+from src.envs.graph_coloring.gc_simulation.simulator import Simulator
 from src.envs.graph_coloring.gc_utils.graph_utils import add_color_nodes_to_graph
 
 
@@ -20,8 +21,14 @@ class GraphWithColorsWrapper(Wrapper):
     in the end the new graph includes n+m+1 nodes (n original nodes + m colors used + 1 new color)
     and E + n*(m+1) edges at most (there can be less edges if there are already colored nodes that created constraints)
     """
-    @staticmethod
-    def obs_to_graph_dict(obs) -> tg.data.Data:
+    def __init__(self, env: Simulator):
+        super().__init__(env)
+        # dictionary between action id and (num edge) and nodes the edge connects
+        self.action_to_simulation_action_dict = {}
+        # dictionary between node id and node color (used for translating action to simulation action)
+        self.node_to_color_dict = {}
+
+    def obs_to_graph_dict(self, obs: Dict) -> tg.data.Data:
         """
         this function takes the observation and creates a graph including the following
         features: [indicator, color]
@@ -54,12 +61,11 @@ class GraphWithColorsWrapper(Wrapper):
         # save illegal actions tensor
         # an edge that is part of the real graph is considered illegal, therefore if indicator = 0 the edge is illegal
         # (so we take the logical_not if the indicators
-        graph_tg.illegal_actions = torch.logical_not(graph_tg.edge_attr)
-        graph_tg.u = torch.tensor([0], dtype=torch.float32, device=graph_tg.x.device)
+        graph_tg.illegal_actions = torch.logical_not(graph_tg.edge_attr.view(-1))
+        graph_tg.u = torch.tensor([[0]], dtype=torch.float32, device=graph_tg.x.device)
+        self.action_to_simulation_action_dict = {i: (u, v) for i, (u, v) in enumerate(graph_nx.edges())}
+        self.node_to_color_dict = nx.get_node_attributes(graph_nx, 'color')
         return graph_tg
-
-    def __init__(self, env):
-        super().__init__(env)
 
     def reset(self):
         """
@@ -93,11 +99,9 @@ class GraphWithColorsWrapper(Wrapper):
         :param reinforce_action: int - edge chosen by agent
         :return: tg_obs: tg.Data, reward: double, done: bool. info: Dict
         """
-        if reinforce_action == 0:
-            # this means that the depot was chosen
-            action = self.num_nodes + self.env.DEPOT_INDEX
-        else:
-            action = reinforce_action - 1
+        (node_chosen, color_node_chosen) = self.action_to_simulation_action_dict[reinforce_action]
+        color_chosen = self.node_to_color_dict[color_node_chosen]
+        action = (node_chosen, color_chosen)
         next_state, reward, done, _ = self.env.step(action)
         obs_tg = self.obs_to_graph_dict(next_state)
         return obs_tg, reward, done, {}

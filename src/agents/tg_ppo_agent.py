@@ -292,7 +292,7 @@ class PPOAgent:
 
         # normalized_batch_advantage = self.normalize_batch_advantage(batch_advantage_tensor)
         # Entropy loss
-        entropy_loss = -chosen_logprob.mean() * self.config['entropy_coeff']
+        entropy_loss = -batch_probabilities.mean() * self.config['entropy_coeff']
         # Value loss
         value_loss = (F.mse_loss(batch_state_values, batch_rtgs_tensor) * self.config['value_coeff'])
         total_loss = policy_loss + entropy_loss + value_loss

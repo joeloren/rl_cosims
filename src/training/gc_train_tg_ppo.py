@@ -4,7 +4,6 @@ from typing import Callable, Tuple, List
 
 import numpy as np
 import torch
-from gym import Env
 from tqdm import tqdm
 from trains import Task
 
@@ -44,7 +43,7 @@ def evaluate_policy_simple(problem: Simulator,
 
 
 def evaluate_policy_simple_single_seed(problem: Simulator, policy: Callable[[dict, Simulator], Tuple], seed: int,
-                                       samples_per_seed: int):
+                                       samples_per_seed: int, reward_function: str = "sequential"):
     total_rewards = []
     for j in range(samples_per_seed):
         problem.seed(seed)
@@ -59,13 +58,15 @@ def evaluate_policy_simple_single_seed(problem: Simulator, policy: Callable[[dic
             act = policy(obs, problem)
             obs, reward, completed, _ = problem.step(act)
             total_reward += reward
+        if reward_function == "num_colors":
+            total_reward = problem.get_number_of_colors_used()
         total_rewards.append(total_reward)
     return np.mean(total_rewards)
 
 
 def main():
     # Init environment
-    use_trains = True
+    use_trains = False
     problem_name = 'gc'
     problem_type = 'er_offline'
     num_new_nodes = 0
@@ -73,7 +74,8 @@ def main():
     prob_edge = 0.3
     is_online = False
     random_seed = 0
-    EVAL_BASELINES_RESULTS_FILENAME = (f"experiments/{problem_name}/{num_initial_nodes}n_{num_new_nodes}new_n_{prob_edge}p/"
+    EVAL_BASELINES_RESULTS_FILENAME = (f"experiments/{problem_name}/"
+                                       f"{num_initial_nodes}n_{num_new_nodes}new_n_{prob_edge}p/"
                                        f"baseline_values.json")
 
     env_config = {'problem_type': problem_type,
@@ -91,7 +93,7 @@ def main():
         logger = Task.current_task().get_logger()
         logger.tensorboard_single_series_per_graph(single_series=True)
     else:
-        logger = None
+        task = None
 
     env = create_er_random_graph_problem(num_new_nodes=num_new_nodes, num_initial_nodes=num_initial_nodes,
                                          prob_edge=prob_edge, is_online=is_online, random_seed=random_seed)
@@ -150,7 +152,7 @@ def main():
     or_tools_policy = ORToolsOfflinePolicy(timeout=1000)
     if not baseline_results_path.exists():
         baseline_values = {
-            'distance': evaluate_policy_simple(env, eval_seeds, random_policy_without_newcolor, samples_per_seed=5),
+            'random_wo_nc': evaluate_policy_simple(env, eval_seeds, random_policy_without_newcolor, samples_per_seed=5),
             'ORTools': evaluate_policy_simple(env, eval_seeds, or_tools_policy, samples_per_seed=5)
         }
         baseline_results_path.parent.mkdir(parents=True, exist_ok=True)
@@ -169,8 +171,8 @@ def main():
     model = PolicyModel(cfg=model_config, model_name='ppo_policy_model')
     set_seeds()
     if use_trains:
-        parameters_agent = task.connect(agent_config, name='agent_config')
-        parameters_env = task.connect(env_config, name='env_config')
+        task.connect(agent_config, name='agent_config')
+        task.connect(env_config, name='env_config')
     agent_config['env_config'] = env_config
     ppo_agent = PPOAgent(env_tg,
                          config=agent_config,
