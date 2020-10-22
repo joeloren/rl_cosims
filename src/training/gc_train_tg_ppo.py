@@ -1,6 +1,6 @@
 import json
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Tuple, List
 
 import numpy as np
 import torch
@@ -9,21 +9,22 @@ from tqdm import tqdm
 from trains import Task
 
 # import baseline policy
-from src.envs.cvrp.cvrp_baselines.simple_baseline import distance_proportional_policy
-from src.envs.cvrp.cvrp_baselines.or_tools_baseline import ORToolsPolicy
-# import cvrp simulation -
-from src.envs.cvrp.cvrp_wrappers.cvrp_torch_geometric_wrapper import GeometricBidirectionalWrapper as TgWrapper
-from src.envs.cvrp.cvrp_wrappers.cvrp_torch_geometric_wrapper import ObservationNormalizationWrapper as NormWrapper
+from src.envs.graph_coloring.gc_baselines.ortools_policy import ORToolsOfflinePolicy
+from src.envs.graph_coloring.gc_baselines.simple_policies import random_policy_without_newcolor
+# import gc simulation -
+from src.envs.graph_coloring.gc_simulation.simulator import Simulator
+from src.envs.graph_coloring.gc_wrappers.gc_torch_geometric_wrappers import GraphWithColorsWrapper as TgWrapper
 # import problem creator
-from src.envs.cvrp.cvrp_experimentation.problems import (create_uniform_dynamic_problem, create_fixed_static_problem)
+from src.envs.graph_coloring.gc_experimentation.problems import (create_fixed_static_problem,
+                                                                 create_er_random_graph_problem)
 # import RL algorithm -
 from src.agents.tg_ppo_agent import PPOAgent
 from src.models.tg_models import PolicyGNN as PolicyModel
 
 
-def evaluate_policy_simple(problem: Env,
-                           seeds: np.ndarray,
-                           policy: Callable[[dict, Env], np.ndarray],
+def evaluate_policy_simple(problem: Simulator,
+                           seeds: List,
+                           policy: Callable[[dict, Simulator], Tuple],
                            samples_per_seed=100):
     """
     For num_seeds times, determine the mean policy reward by running it samples_per_seed times.
@@ -42,7 +43,7 @@ def evaluate_policy_simple(problem: Env,
     }
 
 
-def evaluate_policy_simple_single_seed(problem: Env, policy: Callable[[dict, Env], np.ndarray], seed: int,
+def evaluate_policy_simple_single_seed(problem: Simulator, policy: Callable[[dict, Simulator], Tuple], seed: int,
                                        samples_per_seed: int):
     total_rewards = []
     for j in range(samples_per_seed):
@@ -55,8 +56,7 @@ def evaluate_policy_simple_single_seed(problem: Env, policy: Callable[[dict, Env
             reset(obs)
         completed = False
         while not completed:
-            action_probs = policy(obs, problem)
-            act = np.random.choice(len(obs["action_mask"]), p=action_probs)
+            act = policy(obs, problem)
             obs, reward, completed, _ = problem.step(act)
             total_reward += reward
         total_rewards.append(total_reward)
@@ -66,62 +66,38 @@ def evaluate_policy_simple_single_seed(problem: Env, policy: Callable[[dict, Env
 def main():
     # Init environment
     use_trains = True
-    problem_type = 'uniform_offline'
-    max_customer_times = 0
-    size = 20
-    vehicle_velocity = 1
-    vehicle_capacity = 30
+    problem_name = 'gc'
+    problem_type = 'er_offline'
+    num_new_nodes = 0
+    num_initial_nodes = 15
+    prob_edge = 0.3
+    is_online = False
     random_seed = 0
-    max_demand = 10
-    start_at_depot = True
-    EVAL_BASELINES_RESULTS_FILENAME = (f'experiments/{size}s_{vehicle_capacity}c_{max_customer_times}t/'
-                                       f'baseline_values.json')
+    EVAL_BASELINES_RESULTS_FILENAME = (f"experiments/{problem_name}/{num_initial_nodes}n_{num_new_nodes}new_n_{prob_edge}p/"
+                                       f"baseline_values.json")
 
     env_config = {'problem_type': problem_type,
-                  'max_customer_times': max_customer_times,
-                  'size': size,
-                  'max_demand': max_demand,
-                  'vehicle_velocity': vehicle_velocity,
-                  'vehicle_capacity': vehicle_capacity,
-                  'start_at_depot': start_at_depot,
+                  'num_new_nodes': num_new_nodes,
+                  'num_initial_nodes': num_initial_nodes,
+                  'prob_edge': prob_edge,
+                  'is_online': is_online,
                   'random_seed': random_seed,
                   'eval_baseline_results_filename': EVAL_BASELINES_RESULTS_FILENAME}
     if use_trains:
         task = Task.init(
-            project_name="train_cvrp_pytorch",
-            task_name=f'train_ppo_agent_{size}s_{vehicle_capacity}c_{max_customer_times}t'
+            project_name="train_gc_pytorch",
+            task_name=f'train_ppo_agent_{num_initial_nodes}n_{num_new_nodes}new_n_{prob_edge}p'
         )
         logger = Task.current_task().get_logger()
         logger.tensorboard_single_series_per_graph(single_series=True)
     else:
         logger = None
 
-    env = create_uniform_dynamic_problem(max_customer_times=max_customer_times, size=size, max_demand=max_demand,
-                                         vehicle_velocity=vehicle_velocity, vehicle_capacity=vehicle_capacity,
-                                         random_seed=random_seed, start_at_depot=start_at_depot)
+    env = create_er_random_graph_problem(num_new_nodes=num_new_nodes, num_initial_nodes=num_initial_nodes,
+                                         prob_edge=prob_edge, is_online=is_online, random_seed=random_seed)
 
-    # customer_positions = [[0.25, 0.25], [0.5, 0.5], [1, 1]]
-    # env = create_fixed_static_problem(customer_positions=customer_positions,
-    #                                   depot_position=[0, 0],
-    #                                   initial_vehicle_capacity=10,
-    #                                   initial_vehicle_position=[0, 0],
-    #                                   customer_demands=[1]*len(customer_positions),
-    #                                   customer_times=[0]*len(customer_positions),
-    #                                   vehicle_velocity=1)
-    #
-    # env_config = {'problem_type': 'fixed_problem',
-    #               'size': 3,
-    #               'vehicle_capacity': 10,
-    #               'vehicle_position': [0,0],
-    #               'customer_positions':customer_positions,
-    #               'start_at_depot': True
-    #               }
-    # EVAL_BASELINES_RESULTS_FILENAME = (f'experiments/{3}s_{10}c_{0}t/'
-    #                                    f'baseline_values.json')
-
-
-    tg_env = TgWrapper(env)
-    tg_env.reset()
+    env_tg = TgWrapper(env)
+    env_tg.reset()
 
     model_config = {
         'n_passes': 4,
@@ -138,7 +114,7 @@ def main():
         'global_target_dim': 128,
         'global_dim_out': 128,
         'edge_feature_dim': 1,
-        'node_feature_dim': 4,  # indicator, x, y, demand/capacity
+        'node_feature_dim': 2,  # indicator, color
         'global_feature_dim': 1,
         'value_embedding_dim': 128,
         'use_value_critic': True,
@@ -152,29 +128,29 @@ def main():
         'number_of_episodes': 50000,
         # a batch is N episodes where N is number_of_episodes_in_batch
         'number_of_episodes_in_batch': 20,  # this must be a division of number of episodes
-        'total_num_eval_seeds': 10,
+        'total_num_eval_seeds': 2,
         'num_eval_seeds': 2,
         'evaluate_every': 50,
         'num_train_seeds': 2,
         'reward_average_window_size': 10,
         'entropy_coeff': 0.01,  # consider decreasing this back
         'value_coeff': 0.3,
-        'minibatch_size': 256,
         'model_config': model_config,
         'save_checkpoint_every': 1000,
         'eps_clip': 0.5,
         'n_ppo_updates': 20,
         'target_kl': 0.005,
-        'logit_normalizer': 10
+        'logit_normalizer': 10,
+        'problem_name': problem_name   # used for saving results
     }
     agent_config['run_name'] = f"ep_in_batch_{agent_config['number_of_episodes_in_batch']}_" \
                                f"n_eval_{agent_config['num_eval_seeds']}_lr_{agent_config['lr']}"
     eval_seeds = list(range(agent_config['total_num_eval_seeds']))
     baseline_results_path = Path(EVAL_BASELINES_RESULTS_FILENAME)
-    or_tools_policy = ORToolsPolicy(timeout=10)
+    or_tools_policy = ORToolsOfflinePolicy(timeout=10)
     if not baseline_results_path.exists():
         baseline_values = {
-            'distance': evaluate_policy_simple(env, eval_seeds, distance_proportional_policy, samples_per_seed=5),
+            'distance': evaluate_policy_simple(env, eval_seeds, random_policy_without_newcolor, samples_per_seed=5),
             'ORTools': evaluate_policy_simple(env, eval_seeds, or_tools_policy, samples_per_seed=5)
         }
         baseline_results_path.parent.mkdir(parents=True, exist_ok=True)
@@ -196,7 +172,7 @@ def main():
         parameters_agent = task.connect(agent_config, name='agent_config')
         parameters_env = task.connect(env_config, name='env_config')
     agent_config['env_config'] = env_config
-    ppo_agent = PPOAgent(tg_env,
+    ppo_agent = PPOAgent(env_tg,
                          config=agent_config,
                          model=model,
                          eval_seeds=eval_seeds,
