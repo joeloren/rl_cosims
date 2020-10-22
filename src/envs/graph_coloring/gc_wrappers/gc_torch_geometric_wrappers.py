@@ -67,14 +67,13 @@ class GraphWithColorsWrapper(Wrapper):
         for n, f in graph_nx.nodes(data=True):
             node_features.append(np.array([f['indicator'], f['color']]))
         edge_features = []
-        for e in graph_nx.edges(data=True):
+        for e, f in graph_nx.edges(data=True):
             edge_features.append(f['indicator'])
         node_features_array = np.vstack(node_features)
         edge_feature_array = np.vstack(edge_features)
         graph_tg = tg.utils.from_networkx(graph_nx)
         graph_tg.x = node_features_array
         graph_tg.edge_attr = edge_feature_array
-
         return graph_tg
 
     def step(self, reinforce_action: int):

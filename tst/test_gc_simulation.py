@@ -2,8 +2,10 @@ import numpy as np
 
 from src.envs.graph_coloring.gc_experimentation.problems import (create_fixed_static_problem,
                                                                  create_er_random_graph_problem)
-from src.envs.graph_coloring.gc_baselines.simple_policies import random_policy
+from src.envs.graph_coloring.gc_baselines.simple_policies import random_policy, random_policy_without_newcolor
 from src.envs.graph_coloring.gc_baselines.ortools_policy import ORToolsOfflinePolicy
+from src.envs.graph_coloring.gc_utils.graph_utils import create_graph_from_observation
+from src.envs.graph_coloring.gc_utils.graph_utils import add_color_nodes_to_graph
 
 
 def test_fixed_problem():
@@ -159,4 +161,42 @@ def test_ortools_policy_with_er_offline_problem():
     assert or_tools_policy.graph.nodes()[action[0]]['color'] != -1
     assert or_tools_policy.graph.nodes()[action[0]]['color'] == action[1]
 
+
+def test_create_graph_from_observation():
+    sim = create_er_random_graph_problem(num_new_nodes=0, num_initial_nodes=8, prob_edge=0.4,
+                                         is_online=False, random_seed=0)
+    sim.seed(10)
+    obs = sim.reset()
+    is_done = False
+    while not is_done:
+        obs, reward, is_done, _ = sim.step(random_policy_without_newcolor(obs, sim))
+        graph_nx = create_graph_from_observation(obs)
+        # make sure all edges and nodes are the same in both graphs
+        assert np.all(np.array(graph_nx.nodes()) == np.array(sim.current_state.graph.nodes()))
+        assert np.all(np.array(graph_nx.edges()) == np.array(sim.current_state.graph.edges()))
+        # make sure the attributes in both graphs are the same, except for the indicator attribute which we have in
+        # graph_nx and not in the simulation graph
+        assert dict(graph_nx.nodes(data='color')) == dict(sim.current_state.graph.nodes(data='color'))
+        assert dict(graph_nx.nodes(data='start_time')) == dict(sim.current_state.graph.nodes(data='start_time'))
+        graph_nx_pos = [v for v in dict(graph_nx.nodes(data='pos')).values()]
+        graph_sim_pos = [v for v in dict(sim.current_state.graph.nodes(data='pos')).values()]
+        assert np.all(graph_nx_pos) == np.all(graph_sim_pos)
+
+
+def test_add_colors_graph():
+    sim = create_er_random_graph_problem(num_new_nodes=0, num_initial_nodes=8, prob_edge=0.4,
+                                         is_online=False, random_seed=0)
+    sim.seed(10)
+    obs = sim.reset()
+    is_done = False
+    while not is_done:
+        obs, reward, is_done, _ = sim.step(random_policy_without_newcolor(obs, sim))
+        graph_nx = create_graph_from_observation(obs)
+        colors_graph_nx = add_color_nodes_to_graph(obs)
+        # make sure color graph has the correct number of nodes
+        assert len(graph_nx.nodes()) + len(obs["used_colors"]) + 1 == len(colors_graph_nx.nodes())
+        num_colors_used = len(obs["used_colors"])
+        num_colors_color_graph = len(colors_graph_nx.nodes()) - len(graph_nx.nodes())
+        # make sure colored graph has the correct number of nodes added (should be number of used colors + 1)
+        assert num_colors_color_graph == num_colors_used + 1
 
