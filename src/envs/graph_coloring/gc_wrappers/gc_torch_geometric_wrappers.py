@@ -1,8 +1,10 @@
 # basic imports
 from typing import Dict
 # mathematical imports
+import networkx as nx
 import numpy as np
 # nn imports
+import torch
 import torch_geometric as tg
 from gym import Wrapper
 # our imports
@@ -39,17 +41,21 @@ class GraphWithColorsWrapper(Wrapper):
         for n, f in graph_nx.nodes(data=True):
             node_features.append(np.array([f['indicator'], f['color']]))
         edge_features = []
-        for e, f in graph_nx.edges(data=True):
+        for u, v, f in graph_nx.edges(data=True):
             edge_features.append(f['indicator'])
         node_features_array = np.vstack(node_features)
         edge_feature_array = np.vstack(edge_features)
+        # create directed graph from original graph
         graph_tg = tg.utils.from_networkx(graph_nx)
-        graph_tg.x = node_features_array
-        graph_tg.edge_attr = edge_feature_array
-        # illegal actions are all edges that have an indicator 0 which means they are real edges in the graph and not
-        # action edges (for action edges indicator = 1)
-        illegal_actions = [e for e, f in graph_nx.edges(data=True) if f['indicator'] == 0]
-        graph_tg.illegal_actions = illegal_actions
+        # save node features as x tensor
+        graph_tg.x = torch.tensor(node_features_array, dtype=torch.float32)
+        # save edge features as tensor
+        graph_tg.edge_attr = torch.tensor(edge_feature_array, dtype=torch.float32, device=graph_tg.x.device)
+        # save illegal actions tensor
+        # an edge that is part of the real graph is considered illegal, therefore if indicator = 0 the edge is illegal
+        # (so we take the logical_not if the indicators
+        graph_tg.illegal_actions = torch.logical_not(graph_tg.edge_attr)
+        graph_tg.u = torch.tensor([0], dtype=torch.float32, device=graph_tg.x.device)
         return graph_tg
 
     def __init__(self, env):

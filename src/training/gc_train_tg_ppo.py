@@ -147,7 +147,7 @@ def main():
                                f"n_eval_{agent_config['num_eval_seeds']}_lr_{agent_config['lr']}"
     eval_seeds = list(range(agent_config['total_num_eval_seeds']))
     baseline_results_path = Path(EVAL_BASELINES_RESULTS_FILENAME)
-    or_tools_policy = ORToolsOfflinePolicy(timeout=10)
+    or_tools_policy = ORToolsOfflinePolicy(timeout=1000)
     if not baseline_results_path.exists():
         baseline_values = {
             'distance': evaluate_policy_simple(env, eval_seeds, random_policy_without_newcolor, samples_per_seed=5),

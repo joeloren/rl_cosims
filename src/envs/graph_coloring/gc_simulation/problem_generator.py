@@ -35,7 +35,7 @@ class FixedGraphGenerator(ScenarioGenerator):
         """
         self.nodes_id = nodes_ids
         self.edge_indexes = edge_indexes
-        self.graph = nx.Graph()
+        self.graph = nx.DiGraph()
         self.graph.add_nodes_from(self.nodes_id, color=-1, start_time=0)
         self.graph.add_edges_from(self.edge_indexes)
         pos = nx.spring_layout(self.graph)
@@ -88,7 +88,7 @@ class ERGraphGenerator(ScenarioGenerator):
 
     def create_new_graph(self):
         # create random graph -
-        graph = nx.fast_gnp_random_graph(self.num_initial_nodes, self.prob_edge, directed=False)
+        graph = nx.fast_gnp_random_graph(self.num_initial_nodes, self.prob_edge, directed=True)
         # add features to nodes in graph -
         #   - color : the color of the node (default is -1)
         #   - open_time: time when node starts to be visible (in offline problem all start_time is 0)

@@ -19,7 +19,7 @@ def create_graph_from_observation(obs: Dict, with_attributes: bool = True) -> nx
     graph_colors = deepcopy(obs['node_colors'])
     graph_edges = deepcopy(obs['edge_indexes'])
     # create graph and add nodes and edges
-    graph_nx = nx.Graph()
+    graph_nx = nx.DiGraph()
     graph_nx.add_nodes_from(graph_nodes)
     graph_nx.add_edges_from(graph_edges)
     # add attributes to graph
