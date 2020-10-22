@@ -1,11 +1,8 @@
 # basic imports
-from copy import deepcopy
 from typing import Dict
 # mathematical imports
-import networkx as nx
 import numpy as np
 # nn imports
-import torch
 import torch_geometric as tg
 from gym import Wrapper
 # our imports
@@ -21,33 +18,8 @@ class GraphWithColorsWrapper(Wrapper):
     in the end the new graph includes n+m+1 nodes (n original nodes + m colors used + 1 new color)
     and E + n*(m+1) edges at most (there can be less edges if there are already colored nodes that created constraints)
     """
-    def __init__(self, env):
-        super().__init__(env)
-
-    def reset(self):
-        """
-        Reset the environment and return tg observation
-        :return:
-        """
-        # reset env -
-        obs = self.env.reset()
-        # create tg observation from obs dictionary -
-        obs_tg = self.observation(obs)
-        return obs_tg
-
-    def observation(self, obs: Dict) -> tg.data.Data:
-        """
-        Translate current observation into new tg Data tensor
-        :param obs:
-        :return:
-        """
-        # first run any other wrapper in env
-        obs = self.env.observation(obs)
-        # convert observation to tg graph
-        obs_tg = self.obs_to_graph_dict(obs)
-        return obs_tg
-
-    def obs_to_graph_dict(self, obs) -> tg.data.Data:
+    @staticmethod
+    def obs_to_graph_dict(obs) -> tg.data.Data:
         """
         this function takes the observation and creates a graph including the following
         features: [indicator, color]
@@ -74,7 +46,37 @@ class GraphWithColorsWrapper(Wrapper):
         graph_tg = tg.utils.from_networkx(graph_nx)
         graph_tg.x = node_features_array
         graph_tg.edge_attr = edge_feature_array
+        # illegal actions are all edges that have an indicator 0 which means they are real edges in the graph and not
+        # action edges (for action edges indicator = 1)
+        illegal_actions = [e for e, f in graph_nx.edges(data=True) if f['indicator'] == 0]
+        graph_tg.illegal_actions = illegal_actions
         return graph_tg
+
+    def __init__(self, env):
+        super().__init__(env)
+
+    def reset(self):
+        """
+        Reset the environment and return tg observation
+        :return:
+        """
+        # reset env -
+        obs = self.env.reset()
+        # create tg observation from obs dictionary -
+        obs_tg = self.observation(obs)
+        return obs_tg
+
+    def observation(self, obs: Dict) -> tg.data.Data:
+        """
+        Translate current observation into new tg Data tensor
+        :param obs:
+        :return:
+        """
+        # first run any other wrapper in env
+        obs = self.env.observation(obs)
+        # convert observation to tg graph
+        obs_tg = self.obs_to_graph_dict(obs)
+        return obs_tg
 
     def step(self, reinforce_action: int):
         """
@@ -91,5 +93,5 @@ class GraphWithColorsWrapper(Wrapper):
         else:
             action = reinforce_action - 1
         next_state, reward, done, _ = self.env.step(action)
-        tg_obs = self.obs_to_graph_dict(next_state)
-        return tg_obs, reward, done, {}
+        obs_tg = self.obs_to_graph_dict(next_state)
+        return obs_tg, reward, done, {}
