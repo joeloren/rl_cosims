@@ -157,7 +157,7 @@ def main():
     if not baseline_results_path.exists():
         baseline_values = {
             'random_wo_nc': evaluate_policy_simple(env, eval_seeds, random_policy_without_newcolor, samples_per_seed=1),
-            'ORTools': evaluate_policy_simple(env, eval_seeds, or_tools_policy, samples_per_seed=1)
+            # 'ORTools': evaluate_policy_simple(env, eval_seeds, or_tools_policy, samples_per_seed=1)
         }
         baseline_results_path.parent.mkdir(parents=True, exist_ok=True)
         with open(baseline_results_path, 'w') as f:
