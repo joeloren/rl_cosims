@@ -94,18 +94,18 @@ def main():
 
     model_config = {
         'n_passes': 4,
-        'edge_embedding_dim': 64,
-        'node_embedding_dim': 64,
-        'global_embedding_dim': 64,
-        'edge_hidden_dim': 64,
-        'edge_target_dim': 64,
-        'node_target_dim': 64,
-        'node_dim_out': 64,
+        'edge_embedding_dim': 128,
+        'node_embedding_dim': 128,
+        'global_embedding_dim': 128,
+        'edge_hidden_dim': 128,
+        'edge_target_dim': 128,
+        'node_target_dim': 128,
+        'node_dim_out': 128,
         'edge_dim_out': 1,
-        'node_hidden_dim': 64,
-        'global_hidden_dim': 64,
-        'global_target_dim': 64,
-        'global_dim_out': 64,
+        'node_hidden_dim': 128,
+        'global_hidden_dim': 128,
+        'global_target_dim': 128,
+        'global_dim_out': 128,
         'edge_feature_dim': 1,
         'node_feature_dim': 2,  # indicator, color
         'global_feature_dim': 1,
@@ -120,7 +120,7 @@ def main():
         # number of episodes to do altogether
         'number_of_episodes': 50000,
         # a batch is N episodes where N is number_of_episodes_in_batch
-        'number_of_episodes_in_batch': 40,  # this must be a division of number of episodes
+        'number_of_episodes_in_batch': 10,  # this must be a division of number of episodes
         'total_num_eval_seeds': 100,
         'num_eval_seeds': 10,
         'evaluate_every': 50,
