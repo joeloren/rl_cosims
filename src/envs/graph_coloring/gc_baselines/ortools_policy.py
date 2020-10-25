@@ -94,16 +94,20 @@ class ORToolsOfflinePolicy:
         self.verbose = verbose
         self.__name__ = 'or_tools'
         self.graph = None
+        self.graph_solution = []
         self.node_colors = {}
+        self.next_item_id = 0
 
     def reset(self, obs):
         """
-        :param obs: observation (not used currently)
         this function resets the solution
+        :param obs: observation (not used currently)
         :return:
         """
         self.graph = None
+        self.graph_solution = []
         self.node_colors = {}
+        self.next_item_id = 0
 
     def __call__(self, obs: Dict, env: Simulator):
         """
@@ -132,16 +136,21 @@ class ORToolsOfflinePolicy:
             if found_solution is False:
                 raise RuntimeError(f"no solution was found by or tools for the current graph, "
                                    f"num_iters:{num_iters}, runtime for each try:{self.timeout}")
-
-        available_node_indexes = np.where(obs["node_colors"] == -1)[0]
-        node_chosen = np.random.choice(available_node_indexes, 1)[0]
-        color_chosen = self.node_colors[node_chosen]['color']
+            color_node_dict = dict(self.graph.nodes(data=True))
+            self.graph_solution = [(n, c['color']) for n, c in color_node_dict.items()]
+            # sort results by color so that we can get the next color each time
+            self.graph_solution.sort(key=lambda x: x[1])
+        node_chosen, color_chosen = self.graph_solution[self.next_item_id]
+        self.next_item_id += 1
         if color_chosen == -1:
             raise ValueError(f"current time:{obs['current_time']}, "
                              f"or tools solution did not work, color in solution for chosen node is -1")
         if obs["node_colors"][node_chosen] != -1:
             raise ValueError(f"current time:{obs['current_time']}, "
                              f"node_chosen :{node_chosen}, already has a color:{obs['node_colors'][node_chosen]}")
+        if color_chosen != 0 and color_chosen > max(obs["used_colors"]) + 1:
+            raise ValueError(f"chose a color out of order. chosen color:{color_chosen}. "
+                             f"colors used so far:{obs['used_colors']}.")
         return node_chosen, color_chosen
 
 

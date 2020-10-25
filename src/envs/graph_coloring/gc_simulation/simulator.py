@@ -50,6 +50,7 @@ class Simulator(Env):
         self.current_time = 0  # a ticker which updates at the end of every step() to the next time step
         self.num_max_nodes = num_max_nodes
         self.max_time_steps = max_time_steps
+        self.current_reward = 0.0  # this is needed so that we can calculate the current difference in the reward
         # nodes_id - the id of each node in the graph
         # TODO : add edges to observation dictionary
         # nodes_colors - for each node this is the color it is drawn with (-1 means the node has not been colored yet)
@@ -79,6 +80,7 @@ class Simulator(Env):
         self.initial_state = self.problem_generator.reset()
         self.current_state = deepcopy(self.initial_state)
         self.current_time = 0
+        self.current_reward = 0.0
         return self.current_state_to_observation()
 
     def seed(self, seed=None) -> None:
@@ -107,13 +109,17 @@ class Simulator(Env):
         self.current_state.num_colored_nodes += 1
         self.current_state.nodes_order.append(node_chosen)
         reward = -len(self.current_state.unique_colors)
+        # calculate the added reward in the current step
+        reward_diff = reward - self.current_reward
+        # save the current reward, to be used in the next calculation
+        self.current_reward = reward
         is_done = self.calc_is_done()
         self.current_time += 1
         self.current_state.current_time = self.current_time
         if not is_done:
             # add new nodes to problem if online
             self.current_state = self.problem_generator.next(self.current_state)
-        return self.current_state_to_observation(), reward, is_done, {}
+        return self.current_state_to_observation(), reward_diff, is_done, {}
 
     def calc_is_done(self) -> bool:
         """

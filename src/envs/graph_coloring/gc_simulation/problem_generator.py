@@ -35,6 +35,7 @@ class FixedGraphGenerator(ScenarioGenerator):
         """
         self.nodes_id = nodes_ids
         self.edge_indexes = edge_indexes
+        self.edge_indexes.append((j, i) for i, j in self.edge_indexes)
         self.graph = nx.DiGraph()
         self.graph.add_nodes_from(self.nodes_id, color=-1, start_time=0)
         self.graph.add_edges_from(self.edge_indexes)
@@ -89,6 +90,8 @@ class ERGraphGenerator(ScenarioGenerator):
     def create_new_graph(self):
         # create random graph -
         graph = nx.fast_gnp_random_graph(self.num_initial_nodes, self.prob_edge, directed=True)
+        undirected_edges = [(j, i) for i, j in graph.edges()]
+        graph.add_edges_from(undirected_edges)
         # add features to nodes in graph -
         #   - color : the color of the node (default is -1)
         #   - open_time: time when node starts to be visible (in offline problem all start_time is 0)
@@ -117,6 +120,7 @@ class ERGraphGenerator(ScenarioGenerator):
             for n in current_state.graph.nodes():
                 if np.random.random() > self.prob_edge:
                     current_state.graph.add_edge(num_node_to_add, n)
+                    current_state.graph.add_edge(n, num_node_to_add)  # add edge in other direction
         return current_state
 
     def reset(self) -> State:

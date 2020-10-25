@@ -54,10 +54,12 @@ def evaluate_policy_simple_single_seed(problem: Simulator, policy: Callable[[dic
         if callable(reset):
             reset(obs)
         completed = False
+        reward_list = []
         while not completed:
             act = policy(obs, problem)
             obs, reward, completed, _ = problem.step(act)
             total_reward += reward
+            reward_list.append(reward)
         if reward_function == "num_colors":
             total_reward = problem.get_number_of_colors_used()
         total_rewards.append(total_reward)
@@ -74,17 +76,6 @@ def main():
     prob_edge = 0.3
     is_online = False
     random_seed = 0
-    EVAL_BASELINES_RESULTS_FILENAME = (f"experiments/{problem_name}/"
-                                       f"{num_initial_nodes}n_{num_new_nodes}new_n_{prob_edge}p/"
-                                       f"baseline_values.json")
-
-    env_config = {'problem_type': problem_type,
-                  'num_new_nodes': num_new_nodes,
-                  'num_initial_nodes': num_initial_nodes,
-                  'prob_edge': prob_edge,
-                  'is_online': is_online,
-                  'random_seed': random_seed,
-                  'eval_baseline_results_filename': EVAL_BASELINES_RESULTS_FILENAME}
     if use_trains:
         task = Task.init(
             project_name="train_gc_pytorch",
@@ -129,11 +120,11 @@ def main():
         # number of episodes to do altogether
         'number_of_episodes': 50000,
         # a batch is N episodes where N is number_of_episodes_in_batch
-        'number_of_episodes_in_batch': 20,  # this must be a division of number of episodes
-        'total_num_eval_seeds': 2,
-        'num_eval_seeds': 2,
+        'number_of_episodes_in_batch': 40,  # this must be a division of number of episodes
+        'total_num_eval_seeds': 100,
+        'num_eval_seeds': 10,
         'evaluate_every': 50,
-        'num_train_seeds': 2,
+        'num_train_seeds': 100,
         'reward_average_window_size': 10,
         'entropy_coeff': 0.01,  # consider decreasing this back
         'value_coeff': 0.3,
@@ -145,6 +136,19 @@ def main():
         'logit_normalizer': 10,
         'problem_name': problem_name   # used for saving results
     }
+
+    EVAL_BASELINES_RESULTS_FILENAME = (f"experiments/{problem_name}/"
+                                       f"{agent_config['total_num_eval_seeds']}n-seeds_{num_initial_nodes}n_"
+                                       f"{num_new_nodes}new_n_{prob_edge}p/"
+                                       f"baseline_values.json")
+
+    env_config = {'problem_type': problem_type,
+                  'num_new_nodes': num_new_nodes,
+                  'num_initial_nodes': num_initial_nodes,
+                  'prob_edge': prob_edge,
+                  'is_online': is_online,
+                  'random_seed': random_seed,
+                  'eval_baseline_results_filename': EVAL_BASELINES_RESULTS_FILENAME}
     agent_config['run_name'] = f"ep_in_batch_{agent_config['number_of_episodes_in_batch']}_" \
                                f"n_eval_{agent_config['num_eval_seeds']}_lr_{agent_config['lr']}"
     eval_seeds = list(range(agent_config['total_num_eval_seeds']))
@@ -152,8 +156,8 @@ def main():
     or_tools_policy = ORToolsOfflinePolicy(timeout=1000)
     if not baseline_results_path.exists():
         baseline_values = {
-            'random_wo_nc': evaluate_policy_simple(env, eval_seeds, random_policy_without_newcolor, samples_per_seed=5),
-            'ORTools': evaluate_policy_simple(env, eval_seeds, or_tools_policy, samples_per_seed=5)
+            'random_wo_nc': evaluate_policy_simple(env, eval_seeds, random_policy_without_newcolor, samples_per_seed=1),
+            'ORTools': evaluate_policy_simple(env, eval_seeds, or_tools_policy, samples_per_seed=1)
         }
         baseline_results_path.parent.mkdir(parents=True, exist_ok=True)
         with open(baseline_results_path, 'w') as f:
