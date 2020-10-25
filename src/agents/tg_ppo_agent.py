@@ -243,11 +243,12 @@ class PPOAgent:
                                self.episode_number)
         self.writer.add_scalar('Train/MinRTGs', torch.min(torch.tensor(self.batch_rtgs)), self.episode_number)
         self.writer.add_scalar('Train/MaxRTGs', torch.max(torch.tensor(self.batch_rtgs)), self.episode_number)
-        # log memory to see cuda information:
-        mem_allocated = torch.cuda.memory_allocated(self.device)
-        mem_reserved = torch.cuda.memory_reserved(self.device)
-        self.writer.add_scalar('Train/cuda_reserved', mem_reserved, self.episode_number)
-        self.writer.add_scalar('Train/cuda_allocated', mem_allocated, self.episode_number)
+        if torch.cuda.is_available():
+            # log memory to see cuda information:
+            mem_allocated = torch.cuda.memory_allocated(self.device)
+            mem_reserved = torch.cuda.memory_reserved(self.device)
+            self.writer.add_scalar('Train/cuda_reserved', mem_reserved, self.episode_number)
+            self.writer.add_scalar('Train/cuda_allocated', mem_allocated, self.episode_number)
 
         self.reset_batches()
         return total_loss
