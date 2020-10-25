@@ -5,6 +5,7 @@ import numpy as np
 class KnapsackArrayWrapper(gym.Wrapper):
     def __init__(self, env: gym.Env):
         super().__init__(env)
+        self.observation_space = gym.spaces.Box(low=0, high=1, shape=(4,), dtype=np.float32)
 
     def reset(self):
         # reset env -

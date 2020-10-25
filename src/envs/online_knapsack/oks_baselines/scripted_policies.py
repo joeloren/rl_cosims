@@ -16,6 +16,7 @@ def random_policy(obs, env: Simulator) -> int:
     else:
         return 0
 
+
 def simple_policy(obs, env: Simulator) -> int:
     """
     this function chooses if to take the current item or not
