@@ -72,8 +72,8 @@ def main():
     problem_name = 'gc'
     problem_type = 'er_offline'
     num_new_nodes = 0
-    num_initial_nodes = 15
-    prob_edge = 0.3
+    num_initial_nodes = 50
+    prob_edge = 0.4
     is_online = False
     random_seed = 0
     if use_trains:
@@ -153,7 +153,7 @@ def main():
                                f"n_eval_{agent_config['num_eval_seeds']}_lr_{agent_config['lr']}"
     eval_seeds = list(range(agent_config['total_num_eval_seeds']))
     baseline_results_path = Path(EVAL_BASELINES_RESULTS_FILENAME)
-    or_tools_policy = ORToolsOfflinePolicy(timeout=1000)
+    or_tools_policy = ORToolsOfflinePolicy(timeout=10000)
     if not baseline_results_path.exists():
         baseline_values = {
             'random_wo_nc': evaluate_policy_simple(env, eval_seeds, random_policy_without_newcolor, samples_per_seed=1),
