@@ -1,0 +1,6 @@
+{
+  "num_new_nodes": 10,
+  "num_initial_nodes": 5,
+  "prob_edge": 0.3,
+  "is_online": true
+}

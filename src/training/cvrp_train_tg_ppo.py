@@ -66,6 +66,7 @@ def evaluate_policy_simple_single_seed(problem: Env, policy: Callable[[dict, Env
 def main():
     # Init environment
     use_trains = True
+    problem_name = 'cvrp'
     problem_type = 'uniform_offline'
     max_customer_times = 0
     size = 20
@@ -74,8 +75,8 @@ def main():
     random_seed = 0
     max_demand = 10
     start_at_depot = True
-    EVAL_BASELINES_RESULTS_FILENAME = (f'experiments/{size}s_{vehicle_capacity}c_{max_customer_times}t/'
-                                       f'baseline_values.json')
+    EVAL_BASELINES_RESULTS_FILENAME = (f"experiments/{problem_name}/{size}s_{vehicle_capacity}c_{max_customer_times}t/"
+                                       f"baseline_values.json")
 
     env_config = {'problem_type': problem_type,
                   'max_customer_times': max_customer_times,
@@ -159,13 +160,13 @@ def main():
         'reward_average_window_size': 10,
         'entropy_coeff': 0.01,  # consider decreasing this back
         'value_coeff': 0.3,
-        'minibatch_size': 256,
         'model_config': model_config,
         'save_checkpoint_every': 1000,
         'eps_clip': 0.5,
         'n_ppo_updates': 20,
         'target_kl': 0.005,
-        'logit_normalizer': 10
+        'logit_normalizer': 10,
+        'problem_name': problem_name  # used for saving results
     }
     agent_config['run_name'] = f"ep_in_batch_{agent_config['number_of_episodes_in_batch']}_" \
                                f"n_eval_{agent_config['num_eval_seeds']}_lr_{agent_config['lr']}"

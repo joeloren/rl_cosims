@@ -16,6 +16,7 @@ class State:
     graph: nx.Graph  # this represents in the graph using network x representation
     num_colored_nodes: int  # number of colored nodes so far
     nodes_order: List  # list of the order the nodes were chosen
+    current_time: int  # the current simulation time
     # each node in the graph has :
     #   - color : the color of the node (default is -1)
     #   - open_time: time when node starts to be visible (in offline problem all start_time is 0)
@@ -26,7 +27,12 @@ class Simulator(Env):
     EPSILON_TIME = 1e-6
     metadata = {"render.modes": ["human"]}
 
-    def __init__(self, num_max_nodes: int, problem_generator) -> None:
+    @staticmethod
+    def observation(obs):
+        # the simulator returns obs without any changes (used for wrappers)
+        return obs
+
+    def __init__(self, num_max_nodes: int, max_time_steps: int, problem_generator) -> None:
         """
         Create a new graph_coloring. Note that you need to call reset() before starting the simulation.
         :param num_max_nodes: maximum number of nodes in the graph [int]
@@ -36,33 +42,27 @@ class Simulator(Env):
         """
         super().__init__()
         # initial state is empty data variables if self.reset() is not called
-        self.initial_state: State = State(unique_colors=set(), graph=nx.Graph(), num_colored_nodes=0, nodes_order=[])
+        self.initial_state: State = State(unique_colors=set(), graph=nx.Graph(), num_colored_nodes=0,
+                                          nodes_order=[], current_time=0)
         # current state of the simulation, this is updated at every step() call
         self.current_state: State = deepcopy(self.initial_state)
         self.problem_generator = problem_generator  # during reset this will generate a new instance of state
         self.current_time = 0  # a ticker which updates at the end of every step() to the next time step
         self.num_max_nodes = num_max_nodes
+        self.max_time_steps = max_time_steps
+        self.current_reward = 0.0  # this is needed so that we can calculate the current difference in the reward
         # nodes_id - the id of each node in the graph
         # TODO : add edges to observation dictionary
         # nodes_colors - for each node this is the color it is drawn with (-1 means the node has not been colored yet)
         # used_color_ids - this is a bool vector if color is used or not
         # (0 - not used, 1 - used at least once in the graph)
         obs_spaces = {
-            "nodes_id": spaces.Box(
-                low=0, high=self.num_max_nodes,
-                shape=(self.num_max_nodes,), dtype=np.int32),
-            "edge_indexes": spaces.Box(
-                low=0, high=self.num_max_nodes,
-                shape=(self.num_max_nodes, 2), dtype=np.int32),
-            "current_time": spaces.Box(
-                low=0, high=np.finfo(np.float32).max, shape=(1,), dtype=np.float32
-            ),
-            "nodes_color": spaces.Box(
-                low=-1, high=self.num_max_nodes,
-                shape=(self.num_max_nodes,), dtype=np.int32),
-            "used_color_ids": spaces.Box(
-                low=0, high=self.num_max_nodes,
-                shape=(self.num_max_nodes,), dtype=np.bool)
+            "nodes_id": spaces.Box(low=0, high=self.num_max_nodes, shape=(self.num_max_nodes,), dtype=np.int32),
+            "edge_indexes": spaces.Box(low=0, high=self.num_max_nodes, shape=(self.num_max_nodes, 2), dtype=np.int32),
+            "current_time": spaces.Box(low=0, high=np.finfo(np.float32).max, shape=(1,), dtype=np.float32),
+            "nodes_color": spaces.Box(low=-1, high=self.num_max_nodes, shape=(self.num_max_nodes,), dtype=np.int32),
+            "used_color_ids": spaces.Box(low=0, high=self.num_max_nodes, shape=(self.num_max_nodes,), dtype=np.bool),
+            "nodes_start_time": spaces.Box(low=0, high=self.num_max_nodes, shape=(self.num_max_nodes,), dtype=np.int32),
         }
         self.observation_space = spaces.Dict(obs_spaces)
 
@@ -80,6 +80,7 @@ class Simulator(Env):
         self.initial_state = self.problem_generator.reset()
         self.current_state = deepcopy(self.initial_state)
         self.current_time = 0
+        self.current_reward = 0.0
         return self.current_state_to_observation()
 
     def seed(self, seed=None) -> None:
@@ -107,17 +108,27 @@ class Simulator(Env):
             self.current_state.unique_colors.add(color_chosen)
         self.current_state.num_colored_nodes += 1
         self.current_state.nodes_order.append(node_chosen)
-        reward = len(self.current_state.unique_colors)
+        reward = -len(self.current_state.unique_colors)
+        # calculate the added reward in the current step
+        reward_diff = reward - self.current_reward
+        # save the current reward, to be used in the next calculation
+        self.current_reward = reward
         is_done = self.calc_is_done()
         self.current_time += 1
-        return self.current_state_to_observation(), reward, is_done, {}
+        self.current_state.current_time = self.current_time
+        if not is_done:
+            # add new nodes to problem if online
+            self.current_state = self.problem_generator.next(self.current_state)
+        return self.current_state_to_observation(), reward_diff, is_done, {}
 
-    def calc_is_done(self):
+    def calc_is_done(self) -> bool:
         """
         calculate if the simulation is done
-        simulation is done if the number of nodes in the graph are equal to the number of nodes we colored
+        simulation is done if the number of nodes in the graph are equal to the number of nodes we colored or we reached
+        the maximum number of time steps
         """
-        if self.current_state.graph.number_of_nodes() == self.current_state.num_colored_nodes:
+        if (self.current_state.graph.number_of_nodes() == self.current_state.num_colored_nodes or
+                self.current_time == self.max_time_steps):
             return True
         else:
             return False
@@ -128,13 +139,19 @@ class Simulator(Env):
         """
         nodes_id = np.array(self.current_state.graph.nodes)
         colors = nx.get_node_attributes(self.current_state.graph, 'color')
+        positions = self.current_state.graph.nodes('pos')
+        node_positions = [positions[i] for i in nodes_id]
+        start_times = nx.get_node_attributes(self.current_state.graph, 'start_time')
         node_colors = np.array([colors[i] for i in nodes_id])
+        node_start_times = np.array([start_times[i] for i in nodes_id])
         obs = {
             'node_colors': node_colors,
             'used_colors': deepcopy(self.current_state.unique_colors),
             'nodes_id': nodes_id,
             'edge_indexes': list(self.current_state.graph.edges),
-            'current_time': self.current_time
+            'current_time': self.current_time,
+            'nodes_start_time': node_start_times,
+            'node_positions': node_positions
         }
         return obs
 

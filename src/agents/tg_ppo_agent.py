@@ -39,7 +39,6 @@ class PPOAgent:
         self.old_policy.load_state_dict(self.policy.state_dict())
         self.optimizer = optim.Adam(self.policy.parameters(), lr=self.config['lr'])
         self.episode_rewards = []
-        self.minibatch_size = self.config['minibatch_size']
         self.n_ppo_updates = self.config['n_ppo_updates']
         self.target_kl = self.config['target_kl']
         # fpr clamped policy loss (PPO)
@@ -66,7 +65,7 @@ class PPOAgent:
             verbose=True,
         )
         time_str = datetime.datetime.now().strftime('%Y-%m-%d_%H_%M_%S')
-        output_dir = f'runs/ppo_agent/{time_str}'
+        output_dir = f"runs/{self.config['problem_name']}/ppo_agent/{time_str}"
         path = Path(output_dir)
         if not path.exists():
             path.mkdir(parents=True)
@@ -293,7 +292,7 @@ class PPOAgent:
 
         # normalized_batch_advantage = self.normalize_batch_advantage(batch_advantage_tensor)
         # Entropy loss
-        entropy_loss = -chosen_logprob.mean() * self.config['entropy_coeff']
+        entropy_loss = -batch_probabilities.mean() * self.config['entropy_coeff']
         # Value loss
         value_loss = (F.mse_loss(batch_state_values, batch_rtgs_tensor) * self.config['value_coeff'])
         total_loss = policy_loss + entropy_loss + value_loss

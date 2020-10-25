@@ -31,7 +31,7 @@ def solve_or_tools(nodes: List[int], edges: List[Tuple], max_num_colors: int, ti
     :param timeout: run time given to algorithm
     :return:
     """
-    solver = pywraplp.Solver.CreateSolver('graph_coloring_solver', "CBC")
+    solver = pywraplp.Solver.CreateSolver("CBC")
     solver.set_time_limit(timeout)
     num_nodes = len(nodes)
     # x[i,c] = 1 means that node i is assigned color c
@@ -58,7 +58,7 @@ def solve_or_tools(nodes: List[int], edges: List[Tuple], max_num_colors: int, ti
     # run solver -
     results_status = solver.Solve()
     node_color = {}
-    graph = nx.Graph()
+    graph = nx.DiGraph()
     graph.add_nodes_from(nodes, color=-1)
     graph.add_edges_from(edges)
     found_solution = False
@@ -94,16 +94,20 @@ class ORToolsOfflinePolicy:
         self.verbose = verbose
         self.__name__ = 'or_tools'
         self.graph = None
+        self.graph_solution = []
         self.node_colors = {}
+        self.next_item_id = 0
 
     def reset(self, obs):
         """
-        :param obs: observation (not used currently)
         this function resets the solution
+        :param obs: observation (not used currently)
         :return:
         """
         self.graph = None
+        self.graph_solution = []
         self.node_colors = {}
+        self.next_item_id = 0
 
     def __call__(self, obs: Dict, env: Simulator):
         """
@@ -118,7 +122,7 @@ class ORToolsOfflinePolicy:
             edges = obs["edge_indexes"]
             found_solution = False
             num_iters = 0
-            for i in range(4, len(nodes)):
+            for i in range(np.min([len(nodes), 4]), len(nodes)+1):
                 max_num_colors = i
                 if self.verbose:
                     print(f"trying to solve or-tools with maximum colors:{i} , num nodes:{len(nodes)}")
@@ -132,16 +136,21 @@ class ORToolsOfflinePolicy:
             if found_solution is False:
                 raise RuntimeError(f"no solution was found by or tools for the current graph, "
                                    f"num_iters:{num_iters}, runtime for each try:{self.timeout}")
-
-        available_node_indexes = np.where(obs["node_colors"] == -1)[0]
-        node_chosen = np.random.choice(available_node_indexes, 1)[0]
-        color_chosen = self.node_colors[node_chosen]['color']
+            color_node_dict = dict(self.graph.nodes(data=True))
+            self.graph_solution = [(n, c['color']) for n, c in color_node_dict.items()]
+            # sort results by color so that we can get the next color each time
+            self.graph_solution.sort(key=lambda x: x[1])
+        node_chosen, color_chosen = self.graph_solution[self.next_item_id]
+        self.next_item_id += 1
         if color_chosen == -1:
             raise ValueError(f"current time:{obs['current_time']}, "
                              f"or tools solution did not work, color in solution for chosen node is -1")
         if obs["node_colors"][node_chosen] != -1:
             raise ValueError(f"current time:{obs['current_time']}, "
                              f"node_chosen :{node_chosen}, already has a color:{obs['node_colors'][node_chosen]}")
+        if color_chosen != 0 and color_chosen > max(obs["used_colors"]) + 1:
+            raise ValueError(f"chose a color out of order. chosen color:{color_chosen}. "
+                             f"colors used so far:{obs['used_colors']}.")
         return node_chosen, color_chosen
 
 
@@ -162,14 +171,14 @@ def main():
     num_nodes = 20
     prob_edges = 0.3
     max_num_colors = 10
-    graph = er_graph(n=num_nodes, p=prob_edges)
-    node_att_color = {i: {'color': -1} for i in graph.nodes()}
-    nx.set_node_attributes(graph, node_att_color)
+    graph = er_graph(n=num_nodes, p=prob_edges, directed=True)
+    pos = nx.spring_layout(graph)
+    att = {i: {'color': -1, 'start_time': 0, 'pos': p} for i, p in pos.items()}
+    nx.set_node_attributes(graph, att)
     nodes = list(graph.nodes)
     edges = list(graph.edges)
     node_colors, graph, found_solution = solve_or_tools(nodes=nodes, edges=edges,
                                                         max_num_colors=max_num_colors, timeout=2000)
-    plot_gc_solution(graph, [])
     or_tools_policy = ORToolsOfflinePolicy(verbose=True, timeout=1000)
     env = create_fixed_static_problem(nodes, edges, random_seed=0)
     obs = env.reset()
