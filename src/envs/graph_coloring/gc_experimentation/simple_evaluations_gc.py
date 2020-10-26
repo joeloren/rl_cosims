@@ -146,7 +146,7 @@ def main():
     plt.show()
     with open(args.output_file, "w") as f:
         json.dump(values, f, indent=4)
-    plot_multiple_result_stats(policy_values=values, relative_to='Random W/O new color')
+    plot_multiple_result_stats(policy_values=values, relative_to='OrTools')
 
 
 if __name__ == "__main__":
