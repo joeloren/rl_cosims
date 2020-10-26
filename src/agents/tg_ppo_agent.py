@@ -284,7 +284,7 @@ class PPOAgent:
 
         batch_probabilities = tg_utils.softmax(batch_scores, edge_batch_indexes)
         batch_graph_size = torch.tensor([torch.sum(edge_batch_indexes == b) for b in range(state_batch.num_graphs)]).to(
-            self.device)
+            "cpu")
         cumulative_batch_actions = torch.tensor(self.batch_actions).to(device="cpu")
         cumulative_batch_actions[1:] = (torch.cumsum(batch_graph_size, dim=0)[:-1] + cumulative_batch_actions[1:])
         chosen_probabilities = batch_probabilities.gather(dim=0, index=cumulative_batch_actions.view(-1, 1))
