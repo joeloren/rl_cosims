@@ -30,12 +30,14 @@ class ItemGenerator(ScenarioGenerator):
     """
     this class creates an item generator
     """
+    def __init__(self, seed=42):
+        self.random_state = np.random.RandomState(seed=seed)
 
     def sample_item(self):
-        return [np.random.rand(), np.random.rand()]
+        return [self.random_state.rand(), self.random_state.rand()]
 
     def seed(self, seed: int) -> None:
-        pass
+        self.random_state.seed(seed)
 
     def reset(self) -> List:
         return self.sample_item()
