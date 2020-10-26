@@ -73,7 +73,7 @@ def main():
     problem_type = 'er_offline'
     num_new_nodes = 0
     num_initial_nodes = 50
-    prob_edge = 0.4
+    prob_edge = 0.3
     is_online = False
     random_seed = 0
     if use_trains:
@@ -120,7 +120,7 @@ def main():
         # number of episodes to do altogether
         'number_of_episodes': 50000,
         # a batch is N episodes where N is number_of_episodes_in_batch
-        'number_of_episodes_in_batch': 40,  # this must be a division of number of episodes
+        'number_of_episodes_in_batch': 10,  # this must be a division of number of episodes
         'total_num_eval_seeds': 100,
         'num_eval_seeds': 10,
         'evaluate_every': 50,

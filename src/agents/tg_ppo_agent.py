@@ -267,13 +267,16 @@ class PPOAgent:
         :return: (total loss, chosen log probabilities, mean approximate kl divergence
 
         """
-        original_logprobs = torch.tensor(self.batch_log_probs).to(device=self.device).view(-1, 1)
+        original_logprobs = torch.tensor(self.batch_log_probs).to(device="cpu").view(-1, 1)
         # Get action log probabilities
-        state_batch = tg_data.Batch.from_data_list(self.batch_states).to(self.device)
+        state_batch = tg_data.Batch.from_data_list(self.batch_states).to(device="cpu")
         self.policy.train()
         edge_rows, edge_cols = state_batch.edge_index
         edge_batch_indexes = state_batch.batch[edge_rows]
-        batch_scores, batch_state_values = self.policy.forward(state_batch.clone())
+        batch_scores, batch_state_values = self.policy.forward(state_batch.to(device=self.device).clone())
+        # convert network outputs to cpu -
+        batch_scores = batch_scores.to(device="cpu")
+        batch_state_values = batch_state_values.to(device="cpu")
         batch_scores = torch.tanh(batch_scores) * self.logit_normalizer
         # in order to get the softmax on each batch separately the indexes for softmax are
         # the batch index for each row in edge index
@@ -282,14 +285,14 @@ class PPOAgent:
         batch_probabilities = tg_utils.softmax(batch_scores, edge_batch_indexes)
         batch_graph_size = torch.tensor([torch.sum(edge_batch_indexes == b) for b in range(state_batch.num_graphs)]).to(
             self.device)
-        cumulative_batch_actions = torch.tensor(self.batch_actions).to(self.device)
+        cumulative_batch_actions = torch.tensor(self.batch_actions).to(device="cpu")
         cumulative_batch_actions[1:] = (torch.cumsum(batch_graph_size, dim=0)[:-1] + cumulative_batch_actions[1:])
         chosen_probabilities = batch_probabilities.gather(dim=0, index=cumulative_batch_actions.view(-1, 1))
         # calculate log after choosing from probability for numerical reasons
-        chosen_logprob = torch.log(chosen_probabilities).to(self.device).view(-1, 1)
+        chosen_logprob = torch.log(chosen_probabilities).to(device="cpu").view(-1, 1)
         # add entropy for exploration
         # Policy loss
-        batch_rtgs_tensor = torch.tensor(self.batch_rtgs, device=self.device, dtype=torch.float32).view(-1, 1)
+        batch_rtgs_tensor = torch.tensor(self.batch_rtgs, device="cpu", dtype=torch.float32).view(-1, 1)
         batch_advantage_tensor = self.normalize_batch_advantage(batch_rtgs_tensor - batch_state_values.detach())
         ratio = torch.exp(chosen_logprob - original_logprobs)
 
