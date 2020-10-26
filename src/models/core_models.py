@@ -107,19 +107,31 @@ class MLPCritic(nn.Module):
 class MLPActorCritic(nn.Module):
 
     def __init__(self, observation_space, action_space,
-                 hidden_sizes=(64, 64), activation=nn.Tanh):
+                 hidden_sizes=(64, 64), activation='tanh'):
         super().__init__()
 
-        obs_dim = observation_space.shape[0]
+        if activation == 'tanh':
+            activation_function = nn.Tanh
+        elif activation == 'relu':
+            activation_function = nn.ReLU
+        else:
+            raise ValueError('Entered an invalid activation function')
+
+        if isinstance(observation_space, int):
+            obs_dim = observation_space
+        else:
+            obs_dim = observation_space.shape[0]
 
         # policy builder depends on action space
         if isinstance(action_space, Box):
-            self.pi = MLPGaussianActor(obs_dim, action_space.shape[0], hidden_sizes, activation)
+            self.pi = MLPGaussianActor(obs_dim, action_space.shape[0], hidden_sizes, activation_function)
         elif isinstance(action_space, Discrete):
-            self.pi = MLPCategoricalActor(obs_dim, action_space.n, hidden_sizes, activation)
+            self.pi = MLPCategoricalActor(obs_dim, action_space.n, hidden_sizes, activation_function)
+        elif isinstance(action_space, int):
+            self.pi = MLPCategoricalActor(obs_dim, action_space, hidden_sizes, activation_function)
 
         # build value function
-        self.v = MLPCritic(obs_dim, hidden_sizes, activation)
+        self.v = MLPCritic(obs_dim, hidden_sizes, activation_function)
 
     def step(self, obs):
         with torch.no_grad():

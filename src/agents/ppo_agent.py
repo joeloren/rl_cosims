@@ -29,7 +29,7 @@ class PPOAgent:
             baseline_eval_values: Dict[str, Dict[int, float]],
     ):
         self.config = config
-        self.env = env
+        self.env: gym.Wrapper = env
         self.device = get_available_device()
         self.separate_v_opt = self.config.get('separate_v_opt', False)
         self.v_lr = self.config.get('v_lr', 1e-3)
@@ -158,21 +158,6 @@ class PPOAgent:
         action, value, logprob = self.policy.step(state)
         # gradients should be in log_prob, actions are without gradients
         return action.item(), logprob.item(), value.item()
-
-    def store_log_probability(self, log_probability):
-        """Stores the log probabilities of picked actions to be used for learning later"""
-        self.batch_log_probs.append(log_probability)
-
-    def store_action(self, action):
-        self.batch_actions.append(action)
-
-    def store_state(self):
-        self.batch_states.append(self.state)
-
-    def store_reward(self):
-        """Stores the reward picked"""
-        if self.reward is not None:
-            self.episode_rewards.append(self.reward)
 
     def store_step(self, state, reward, action, log_prob, val):
         self.batch_states.append(state)
@@ -380,7 +365,7 @@ class PPOAgent:
             'batch_logprobs': self.batch_log_probs,
             'batch_actions': self.batch_actions,
             'eval_seeds': self.eval_seeds,
-            'baseline_eval_values': self.baseline_eval_values
+            'baseline_eval_values': self.baseline_eval_values,
         }
         return checkpoint
 
@@ -404,7 +389,8 @@ class PPOAgent:
             checkpoint = torch.load(checkpoint_path)
         else:
             checkpoint = torch.load(checkpoint_path, map_location=torch.device('cpu'))
-        model: PolicyGNN = PolicyGNN(cfg=checkpoint['config']['model_config'], model_name='ppo_policy_model')
+
+        model: MLPActorCritic = MLPActorCritic(**checkpoint['config']['model_config'])
         model.load_state_dict(checkpoint['policy'])
         old_model = deepcopy(model)
         old_model.load_state_dict(checkpoint['old_policy'])

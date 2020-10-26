@@ -61,29 +61,26 @@ def evaluate_policy_simple_single_seed(problem: Env, policy: Callable[[dict, Env
 def main():
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument('--hid', type=int, default=64)
-    parser.add_argument('--l', type=int, default=2)
-    parser.add_argument('--gamma', type=float, default=0.99)
-    parser.add_argument('--seed', '-s', type=int, default=0)
-    parser.add_argument('--cpu', type=int, default=4)
-    parser.add_argument('--steps', type=int, default=4000)
-    parser.add_argument('--epochs', type=int, default=50)
+    parser.add_argument('--hid', type=int, default=64, help='Size of hidden layers in the model')
+    parser.add_argument('--l', type=int, default=2, help='Number of hidden layers')
+    parser.add_argument('--gamma', type=float, default=0.99, help='Discount factor')
+    parser.add_argument('--cpu', type=int, default=4, help='Force to use cpu during training')
+    parser.add_argument('--steps', type=int, default=4000, help='Maximum number of steps')
     parser.add_argument('--exp_name', type=str, default='knapsack-ppo')
     parser.add_argument('--output', type=str, help='Where to save results')
     parser.add_argument('--items', type=int, default=200, help='Number of items in knapsack instances')
     parser.add_argument('--capacity', type=float, default=20, help='Total initial capacity of the knapsack')
-    parser.add_argument('--no_gpu', action="store_true", help='Force CPU usage.')
     parser.add_argument('--trains', action="store_true", help='Use trains to log training progress.')
     args = parser.parse_args()
 
     EVAL_BASELINES_RESULTS_FILENAME = (f'experiments/{args.items}n_{args.capacity}c/'
                                        f'baseline_values.json')
     dict_env = Simulator(max_steps=args.items, max_capacity=args.capacity,
-                                         problem_generator=ItemGenerator())
+                         problem_generator=ItemGenerator())
     env = KnapsackArrayWrapper(dict_env)
 
-    model_config = dict(observation_space=env.observation_space, action_space=env.action_space,
-                        hidden_sizes=[args.hid] * args.l, activation=torch.nn.ReLU)
+    model_config = dict(observation_space=env.observation_space.shape[0], action_space=env.action_space.n,
+                        hidden_sizes=[args.hid] * args.l, activation='relu')
 
     agent_config = dict(
         run_name=f'{args.exp_name}-n{args.items}-c{args.capacity}',
@@ -101,7 +98,7 @@ def main():
         entropy_coeff=0.01,  # consider decreasing this back
         value_coeff=0.3,
         minibatch_size=256,
-        # model_config=model_config,
+        model_config=model_config,
         save_checkpoint_every=1000,
         eps_clip=0.2,
         n_ppo_updates=20,
