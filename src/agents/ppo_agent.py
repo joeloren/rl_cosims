@@ -31,11 +31,18 @@ class PPOAgent:
         self.config = config
         self.env = env
         self.device = get_available_device()
+        self.separate_v_opt = self.config.get('separate_v_opt', False)
+        self.v_lr = self.config.get('v_lr', 1e-3)
+        self.train_v_iters = self.config.get('train_v_iters', 80)
         print(f'device chosen:{self.device}')
         self.policy: MLPActorCritic = model.to(self.device)
         self.old_policy = deepcopy(self.policy)
         self.old_policy.load_state_dict(self.policy.state_dict())
-        self.optimizer = optim.Adam(self.policy.parameters(), lr=self.config['lr'])
+        if self.separate_v_opt:
+            self.optimizer = optim.Adam(self.policy.pi.parameters(), lr=self.config['lr'])
+            self.v_optimizer = optim.Adam(self.policy.v.parameters(), lr=self.v_lr)
+        else:
+            self.optimizer = optim.Adam(self.policy.parameters(), lr=self.config['lr'])
         self.episode_rewards = []
         self.minibatch_size = self.config['minibatch_size']
         self.n_ppo_updates = self.config['n_ppo_updates']
@@ -64,10 +71,10 @@ class PPOAgent:
             verbose=True,
         )
         time_str = datetime.datetime.now().strftime('%Y-%m-%d_%H_%M_%S')
-        output_dir = config.get('output_dir', '.') or '.'
+        run_name = config.get('run_name', '') or ''
         print('config: ')
         print(config)
-        output_dir = str(Path(output_dir) / f'runs/ppo_agent/{time_str}')
+        output_dir = f'runs/ppo_agent/{run_name}/{time_str}'
         path = Path(output_dir)
         if not path.exists():
             path.mkdir(parents=True)
@@ -83,7 +90,7 @@ class PPOAgent:
         # dictionary where the key is the reward and the value is the episode number (used for
         # deleting the worst model saved so far)
         self.best_overall_model_episodes = {}
-        self.batch_states, self.batch_rtgs, self.batch_actions, self.batch_log_probs, self.batch_advantage = [], [], [], [], []
+        self.batch_states, self.batch_rtgs, self.batch_actions, self.batch_log_probs, self.batch_vals, self.batch_advantage = [], [], [], [], [], []
         self.best_episode_score = np.inf
 
     def reset_game(self):
@@ -132,14 +139,11 @@ class PPOAgent:
         """Picks and then conducts actions. Then saves the log probabilities of the actions it
         conducted to be used for
         learning later"""
-        action, log_probability = self.select_action_and_log_prob(state=self.state)
+        action, log_probability, val = self.select_action_and_log_prob(state=self.state)
         # store the state, action, reward and log-prob of this step (before action is preformed)
         self.next_state, self.reward, self.done, info = self.env.step(action)
-        if train:  # and (~self.state.illegal_actions).sum() > 1:
-            self.store_state()
-            self.store_log_probability(log_probability)
-            self.store_action(action)
-            self.store_reward()
+        if train:
+            self.store_step(state=self.state, reward=self.reward, action=action, log_prob=log_probability, val=val)
         if self.done:
             # add return to go (rtg) of this episode to batch rtgs
             self.batch_rtgs.extend(self.compute_episode_rtgs())
@@ -151,9 +155,9 @@ class PPOAgent:
         """Picks actions and then calculates the log probabilities of the actions it picked given
         the policy"""
         state = torch.tensor(state, dtype=torch.float32).to(device=self.device)
-        action, _, logprob = self.policy.step(state)
+        action, value, logprob = self.policy.step(state)
         # gradients should be in log_prob, actions are without gradients
-        return action.item(), logprob.item()
+        return action.item(), logprob.item(), value.item()
 
     def store_log_probability(self, log_probability):
         """Stores the log probabilities of picked actions to be used for learning later"""
@@ -169,6 +173,14 @@ class PPOAgent:
         """Stores the reward picked"""
         if self.reward is not None:
             self.episode_rewards.append(self.reward)
+
+    def store_step(self, state, reward, action, log_prob, val):
+        self.batch_states.append(state)
+        if reward is not None:
+            self.episode_rewards.append(self.reward)
+        self.batch_actions.append(action)
+        self.batch_log_probs.append(log_prob)
+        self.batch_vals.append(val)
 
     def compute_episode_rtgs(self):
         """Calculates the cumulative discounted return for the episode"""
@@ -202,6 +214,16 @@ class PPOAgent:
                 print(f"Training: early stopping in PPO pass {i}. Reached approx. mean KL: {mean_kl}")
                 break
         print(f'Total time for all PPO updates: {time.time() - start_time}s')
+
+        if self.separate_v_opt:
+            state_batch = torch.tensor(self.batch_states, device=self.device, dtype=torch.float32)
+            batch_rtgs_tensor = torch.tensor(self.batch_rtgs, device=self.device, dtype=torch.float32).view(-1, 1)
+            for _ in range(self.train_v_iters):
+                self.v_optimizer.zero_grad()
+                value_loss = F.mse_loss(self.policy.v(state_batch).view(-1, 1), batch_rtgs_tensor)
+                value_loss.backward()
+                self.v_optimizer.step()
+                self.writer.add_scalar('Train/Loss/value', value_loss, self.episode_number)
         # self.lr_scheduler.step(sliding_average_total_reward)
         # add things to tb and evaluate if needed -
         if (self.episode_number + 1) % 40 == 0:
@@ -230,6 +252,7 @@ class PPOAgent:
         self.batch_states = []
         self.batch_log_probs = []
         self.batch_advantage = []
+        self.batch_vals = []
         self.episode_number_in_batch = 0
 
     def compute_loss(self):
@@ -241,28 +264,30 @@ class PPOAgent:
         original_logprobs = torch.tensor(self.batch_log_probs).to(device=self.device).view(-1, 1)
         batch_rtgs_tensor = torch.tensor(self.batch_rtgs, device=self.device, dtype=torch.float32).view(-1, 1)
 
+        self.policy.train()
         # Get action log probabilities
         state_batch = torch.tensor(self.batch_states, device=self.device, dtype=torch.float32)
-        batch_state_values = self.policy.v(state_batch).view(-1, 1)
+        # batch_state_values = self.policy.v(state_batch).view(-1, 1)
+        batch_state_values = torch.tensor(self.batch_vals, device=self.device, dtype=torch.float32).view(-1, 1)
         batch_advantage_tensor = self.normalize_batch_advantage(batch_rtgs_tensor - batch_state_values.detach())
-
-        self.policy.train()
         # Policy loss
         pi, chosen_logprob = self.policy.pi(state_batch.clone(), torch.tensor(self.batch_actions).to(device=self.device))
+        chosen_logprob = chosen_logprob.view(-1, 1)
         ratio = torch.exp(chosen_logprob - original_logprobs)
 
         clip_adv = torch.clamp(ratio, 1 - self.eps_clip, 1 + self.eps_clip) * batch_advantage_tensor
         policy_loss = -(torch.min(ratio * batch_advantage_tensor, clip_adv)).mean()
 
         # Useful extra info
-        approx_kl = (original_logprobs - chosen_logprob).mean().item()
-        entropy_loss = pi.entropy().mean().item()
-        # Value loss
-        value_loss = (F.mse_loss(batch_state_values, batch_rtgs_tensor) * self.config['value_coeff'])
-        total_loss = policy_loss + entropy_loss + value_loss
+        entropy_loss = self.config['entropy_coeff'] * pi.entropy().mean().item()
+        if not self.separate_v_opt:
+            # Value loss
+            value_loss = (F.mse_loss(self.policy.v(state_batch).view(-1, 1), batch_rtgs_tensor) * self.config['value_coeff'])
+            total_loss = policy_loss + entropy_loss + value_loss
+            self.writer.add_scalar('Train/Loss/value', value_loss, self.episode_number)
+        else:
+            total_loss = policy_loss + entropy_loss
         mean_kl = (original_logprobs - chosen_logprob).mean().detach().cpu().item()
-
-        self.writer.add_scalar('Train/Loss/value', value_loss, self.episode_number)
         self.writer.add_scalar('Train/Loss/policy', policy_loss.mean(), self.episode_number)
         self.writer.add_scalar('Train/Loss/entropy', entropy_loss, self.episode_number)
         # self.writer.add_scalar('Train/Loss/total', total_loss, self.episode_number)

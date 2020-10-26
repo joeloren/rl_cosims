@@ -39,12 +39,12 @@ class Simulator(Env):
         self.current_state: State = deepcopy(self.initial_state)
         self.problem_generator = problem_generator  # during reset this will generate a new distribution over items
         self.current_time = 0  # a ticker which updates at the end of every step() to the next time step
-        self.observation_indices = {'time ratio': 0, 'capacity ratio': 1, 'value': 2, 'cost': 3}
+        self.observation_indices = {'time ratio': 0, 'capacity ratio': 1, 'value': 2, 'cost': 3, 'value_cost_ratio': 4}
         self.item_indices = {'value': 0, 'cost': 1}
         obs_spaces = {
             "item_obs": spaces.Box(
                 low=0, high=1,
-                shape=(4,), dtype=np.float32)
+                shape=(5,), dtype=np.float32)
         }
         self.observation_space = spaces.Dict(obs_spaces)
         self.action_space = spaces.Discrete(2)
@@ -113,6 +113,7 @@ class Simulator(Env):
         item_obs[self.observation_indices['capacity ratio']] = capacity_ratio
         item_obs[self.observation_indices['value']] = value
         item_obs[self.observation_indices['cost']] = cost
+        item_obs[self.observation_indices['value_cost_ratio']] = value / cost
         obs = {'item_obs': item_obs}
         return obs
 

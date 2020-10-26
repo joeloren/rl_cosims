@@ -8,14 +8,12 @@ import torch
 from trains import Task
 from tqdm import tqdm
 
-from src.utils.logx import setup_logger_kwargs
 from src.models.core_models import MLPActorCritic
 from src.envs.online_knapsack.oks_simulation.problem_generator import ItemGenerator
 from src.envs.online_knapsack.oks_simulation.simulator import Simulator
 from src.envs.online_knapsack.oks_wrappers.array_wrapper import KnapsackArrayWrapper
-from src.training.torch_utils import get_available_device
 from src.agents.ppo_agent import PPOAgent
-from src.utils.utils import set_seeds
+from src.training.torch_utils import set_seeds
 from src.envs.online_knapsack.oks_baselines.scripted_policies import simple_policy, random_policy
 
 
@@ -72,13 +70,12 @@ def main():
     parser.add_argument('--epochs', type=int, default=50)
     parser.add_argument('--exp_name', type=str, default='knapsack-ppo')
     parser.add_argument('--output', type=str, help='Where to save results')
-    parser.add_argument('--items', type=int, default=50, help='Number of items in knapsack instances')
-    parser.add_argument('--capacity', type=float, default=10, help='Total initial capacity of the knapsack')
+    parser.add_argument('--items', type=int, default=200, help='Number of items in knapsack instances')
+    parser.add_argument('--capacity', type=float, default=20, help='Total initial capacity of the knapsack')
     parser.add_argument('--no_gpu', action="store_true", help='Force CPU usage.')
     parser.add_argument('--trains', action="store_true", help='Use trains to log training progress.')
     args = parser.parse_args()
 
-    logger_kwargs = setup_logger_kwargs(args.exp_name, args.seed)
     EVAL_BASELINES_RESULTS_FILENAME = (f'experiments/{args.items}n_{args.capacity}c/'
                                        f'baseline_values.json')
     dict_env = Simulator(max_steps=args.items, max_capacity=args.capacity,
@@ -89,32 +86,29 @@ def main():
                         hidden_sizes=[args.hid] * args.l, activation=torch.nn.ReLU)
 
     agent_config = dict(
-        output_dir=args.output,
-        lr=0.0001,
-        discount=0.95,
+        run_name=f'{args.exp_name}-n{args.items}-c{args.capacity}',
+        lr=3e-4,
+        discount=0.99,
         # number of episodes to do altogether
         number_of_episodes=50000,
         # a batch is N episodes where N is number_of_episodes_in_batch
-        number_of_episodes_in_batch=20,  # this must be a division of number of episodes
-        total_num_eval_seeds=10,
-        num_eval_seeds=2,
+        number_of_episodes_in_batch=50,  # this must be a division of number of episodes
+        total_num_eval_seeds=100,
+        num_eval_seeds=10,
         evaluate_every=50,
-        num_train_seeds=2,
+        num_train_seeds=1000,
         reward_average_window_size=10,
         entropy_coeff=0.01,  # consider decreasing this back
         value_coeff=0.3,
         minibatch_size=256,
         # model_config=model_config,
         save_checkpoint_every=1000,
-        eps_clip=0.5,
+        eps_clip=0.2,
         n_ppo_updates=20,
         target_kl=0.005,
         logit_normalizer=10)
 
-    agent_config['run_name'] = f"ep_in_batch_{agent_config['number_of_episodes_in_batch']}_" \
-                               f"n_eval_{agent_config['num_eval_seeds']}_lr_{agent_config['lr']}"
     agent_config['policy_model_class'] = 'MLPActorCritic'
-    set_seeds()
     if args.trains:
         task = Task.init(
             project_name="train_knapsack_pytorch",
@@ -147,10 +141,10 @@ def main():
                            } for baseline, baseline_dict in baseline_values.items()
             }
 
-    device = "cpu" if args.no_gpu else get_available_device()
     agent_model = MLPActorCritic(**model_config)
     ppo_agent = PPOAgent(env=env, config=agent_config, model=agent_model, eval_seeds=eval_seeds,
                          baseline_eval_values=baseline_values)
+    set_seeds()
     ppo_agent.train()
 
 
