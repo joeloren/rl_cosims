@@ -1,6 +1,6 @@
 import json
 from pathlib import Path
-from typing import Callable, List
+from typing import Callable
 
 import numpy as np
 import torch
@@ -22,7 +22,7 @@ from src.models.tg_models import PolicyGNN as PolicyModel
 
 
 def evaluate_policy_simple(problem: Env,
-                           seeds: List[int],
+                           seeds: np.ndarray,
                            policy: Callable[[dict, Env], np.ndarray],
                            samples_per_seed=100):
     """
