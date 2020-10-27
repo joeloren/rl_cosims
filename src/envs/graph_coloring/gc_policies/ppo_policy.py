@@ -7,7 +7,7 @@ import torch
 from src.agents.tg_ppo_agent import PPOAgent
 from src.models.tg_models import PolicyGNN
 from src.envs.graph_coloring.gc_simulation.simulator import Simulator
-from src.envs.graph_coloring.gc_wrappers.gc_torch_geometric_wrappers import GraphWithColorsWrapper
+from src.envs.graph_coloring.gc_wrappers.gc_torch_geometric_wrappers import GraphOnlyColorsWrapper
 
 
 class PPOPolicy:
@@ -16,7 +16,7 @@ class PPOPolicy:
         # this is used only for the observation function, the real observation is not needed (only the function to
         # translate observation to graph
         # we save both normalized observation and torch observation converter so that we can create both conversions
-        self.tg_env = GraphWithColorsWrapper(env)
+        self.tg_env = GraphOnlyColorsWrapper(env)
         # choose model file as the last model saved
         model_file = max(list(model_folder.glob('model_ep_*')))
         print(f'Loading model file: {model_file}')
@@ -31,7 +31,7 @@ class PPOPolicy:
         # initialize agent with current policy model
         self.agent = PPOAgent(None, agent_config_dict, policy_model, [0], {})
 
-    def __call__(self, state: Dict, env: GraphWithColorsWrapper) -> Tuple:
+    def __call__(self, state: Dict, env: GraphOnlyColorsWrapper) -> Tuple:
         """
         This function calls the policy network after converting the state to a torch geometric grpah and returns the
         action chosen (after the action is converted into a simulation action)

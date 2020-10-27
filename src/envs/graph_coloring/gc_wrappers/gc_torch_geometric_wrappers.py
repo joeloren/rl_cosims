@@ -1,5 +1,7 @@
 # basic imports
+from copy import deepcopy
 from typing import Dict
+
 # mathematical imports
 import networkx as nx
 import numpy as np
@@ -7,9 +9,10 @@ import numpy as np
 import torch
 import torch_geometric as tg
 from gym import Wrapper
+
 # our imports
 from src.envs.graph_coloring.gc_simulation.simulator import Simulator
-from src.envs.graph_coloring.gc_utils.graph_utils import add_color_nodes_to_graph
+from src.envs.graph_coloring.gc_utils.graph_utils import create_graph_from_observation, add_color_nodes_to_graph
 
 
 class GraphWithColorsWrapper(Wrapper):
@@ -21,6 +24,7 @@ class GraphWithColorsWrapper(Wrapper):
     in the end the new graph includes n+m+1 nodes (n original nodes + m colors used + 1 new color)
     and E + n*(m+1) edges at most (there can be less edges if there are already colored nodes that created constraints)
     """
+
     def __init__(self, env: Simulator):
         super().__init__(env)
         # dictionary between action id and (num edge) and nodes the edge connects
@@ -96,6 +100,136 @@ class GraphWithColorsWrapper(Wrapper):
         from ppo action to env action, then steps through the env and translates the observation from dictionary to
         tg observation (tg graph)
         the reward is the negative distance the vehicle travelled between its current position and the chosen position
+        :param reinforce_action: int - edge chosen by agent
+        :return: tg_obs: tg.Data, reward: double, done: bool. info: Dict
+        """
+        (node_chosen, color_node_chosen) = self.action_to_simulation_action_dict[reinforce_action]
+        color_chosen = self.node_to_color_dict[color_node_chosen]
+        action = (node_chosen, color_chosen)
+        next_state, reward, done, _ = self.env.step(action)
+        obs_tg = self.obs_to_graph_dict(next_state)
+        return obs_tg, reward, done, {}
+
+
+class GraphOnlyColorsWrapper(Wrapper):
+    """
+    This class is used as a wrapper for running the gc_simulator with torch geometric.
+    We assume that the state representation is the current graph with additional nodes.
+    we add a new node for each color already used + a new color. We add edges between each not yet colored node
+    in the
+    original graph and the colors that are feasible (not used by neighboring nodes)
+    in the end the new graph includes n+m+1 nodes (n original nodes + m colors used + 1 new color)
+    and E + n*(m+1) edges at most (there can be less edges if there are already colored nodes that created
+    constraints)
+    """
+
+    def __init__(self, env: Simulator):
+        super().__init__(env)
+        # dictionary between action id and (num edge) and nodes the edge connects
+        self.action_to_simulation_action_dict = {}
+        # dictionary between node id and node color (used for translating action to simulation action)
+        self.node_to_color_dict = {}
+
+    def obs_to_graph_dict(self, obs: Dict) -> tg.data.Data:
+        """
+        this function takes the observation and creates a graph including the following
+        features: [indicator, color]
+        indicator: 0: real node, 1: color node
+        color: if no color is used color = -1, otherwise color = id of the color used, for color nodes color =
+        color id of the node.
+        this graph is a bipartite graph and only includes the nodes that are not yet colored from the original graph
+        (this is in order to reduce complexity of the problem)
+        the tg graph has the following attributes:
+        x : node features [n_nodes, n_features]
+        u : global feature [0] for now
+        edge_index: [2, n_edges] matrix where edge_index[i, j] is an edge between node i and node j
+        edge_attribute: edge features [n_edges, n_features]
+        illegal_actions: [n_edges, 1] , boolean vector where True: action is illegal , False: action is feasible
+        """
+        original_graph_nx = create_graph_from_observation(obs, True)
+        nodes_not_colored_id = [i for i in range(len(obs["node_colors"])) if obs["node_colors"][i] == -1]
+        num_nodes_not_colored = len(nodes_not_colored_id)
+        num_color_nodes = len(obs["used_colors"]) + 1  # number of colors used + extra color
+        graph_nodes = [i for i in range(num_nodes_not_colored + num_color_nodes)]
+        # add color feature
+        color_node_features = np.zeros(shape=(num_color_nodes, 2))  # we have 2 features , color and indocator
+        color_node_features[:, 0] = 1  # indicators are 1 for colors
+        real_node_features = np.zeros(shape=(num_nodes_not_colored, 2))
+        real_node_features[:, 1] = -1  # color of all uncolored nodes in graph is -1
+        colors_for_color_node = deepcopy(obs["used_colors"])
+        if len(obs["used_colors"]):
+            new_color_index = 1 + max(obs["used_colors"])
+        else:
+            new_color_index = 0
+        colors_for_color_node.add(new_color_index)
+        color_node_features[:, 1] = np.array(list(colors_for_color_node))  # first feature is the node color
+        node_features_array = np.concatenate([real_node_features, color_node_features])  # full feature matrix
+        # add edges based on color constraints
+        edge_indexes = []
+        for i_n, n in enumerate(nodes_not_colored_id):
+            if original_graph_nx.nodes('color')[n] == -1:
+                allowed_colors = deepcopy(colors_for_color_node)
+                for n_neighbor in original_graph_nx.neighbors(n):
+                    neighbor_color = original_graph_nx.nodes('color')[n_neighbor]
+                    if neighbor_color != -1 and neighbor_color in allowed_colors:
+                        allowed_colors.remove(neighbor_color)
+                for c in allowed_colors:
+                    edge_indexes.append((i_n, int(c) + num_nodes_not_colored))
+        undirected_edge_indexes = [(j, i) for i, j in edge_indexes]
+        num_directed_edges = len(edge_indexes)
+        edge_indexes = edge_indexes + undirected_edge_indexes
+        graph_nx = nx.DiGraph()
+        graph_nx.add_nodes_from(graph_nodes)
+        graph_nx.add_edges_from(edge_indexes)
+        # create directed graph from original graph
+        graph_tg = tg.utils.from_networkx(graph_nx)
+        # save node features as x tensor
+        graph_tg.x = torch.tensor(node_features_array, dtype=torch.float32)
+        # save edge features as tensor
+        edge_features = np.zeros(shape=(graph_tg.edge_index.shape[1], 1))
+        # this is an indicator that these edges are illegal (no need to chose the same edge twice)
+        edge_features[num_directed_edges:] = 1
+        graph_tg.edge_attr = torch.tensor(edge_features, dtype=torch.float32, device=graph_tg.x.device)
+        # save illegal actions tensor
+        # in this case all edges are legal so we remove only the ones that are in the other direction
+        graph_tg.illegal_actions = graph_tg.edge_attr.view(-1).to(dtype=torch.bool)
+        graph_tg.u = torch.tensor([[0]], dtype=torch.float32, device=graph_tg.x.device)
+        self.action_to_simulation_action_dict = {i: (nodes_not_colored_id[u], v) for i, (u, v) in
+                                                 enumerate(graph_nx.edges()) if u < num_nodes_not_colored}
+        self.node_to_color_dict = {i: c for i, c in enumerate(node_features_array[:, 1])}
+        return graph_tg
+
+    def reset(self):
+        """
+        Reset the environment and return tg observation
+        :return:
+        """
+        # reset env -
+        obs = self.env.reset()
+        # create tg observation from obs dictionary -
+        obs_tg = self.observation(obs)
+        return obs_tg
+
+    def observation(self, obs: Dict) -> tg.data.Data:
+        """
+        Translate current observation into new tg Data tensor
+        :param obs:
+        :return:
+        """
+        # first run any other wrapper in env
+        obs = self.env.observation(obs)
+        # convert observation to tg graph
+        obs_tg = self.obs_to_graph_dict(obs)
+        return obs_tg
+
+    def step(self, reinforce_action: int):
+        """
+        this function first translates the action chosen by the agent (in our case the action is an edge in the
+        graph)
+        from ppo action to env action, then steps through the env and translates the observation from dictionary to
+        tg observation (tg graph)
+        the reward is the negative distance the vehicle travelled between its current position and the chosen
+        position
         :param reinforce_action: int - edge chosen by agent
         :return: tg_obs: tg.Data, reward: double, done: bool. info: Dict
         """

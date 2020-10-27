@@ -100,10 +100,10 @@ class PPOAgent:
         self.writer.add_text(f'config/{self.config["run_name"]}', json.dumps(self.config, indent=True), 0)
         for episode in range(self.config['number_of_episodes']):
             self.train_episode()
-            if episode % self.config['evaluate_every'] == 0:
+            if episode % self.config['evaluate_every'] == 0 and episode > 0:
                 print(f'Episode: {episode}, running evaluation')
                 self.evaluate()
-            if episode % self.config['save_checkpoint_every'] == 0:
+            if episode % self.config['save_checkpoint_every'] == 0 and episode > 0:
                 print('Saving a checkpoint')
                 self.save_checkpoint()
 
