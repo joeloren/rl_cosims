@@ -14,10 +14,10 @@ def create_graph_from_observation(obs: Dict, with_attributes: bool = True) -> nx
     :return: graph_nx: graph as networkx
     """
     # get relevant data from observation
-    graph_nodes = list(obs['nodes_id'])
-    graph_node_positions = deepcopy(obs["node_positions"])
-    graph_colors = deepcopy(obs['node_colors'])
-    graph_edges = deepcopy(obs['edge_indexes'])
+    graph_nodes = obs['nodes_id'].tolist()
+    graph_node_positions = obs["node_positions"]
+    graph_colors = obs['node_colors']
+    graph_edges = obs['edge_indexes']
     # create graph and add nodes and edges
     graph_nx = nx.DiGraph()
     graph_nx.add_nodes_from(graph_nodes)
@@ -42,7 +42,7 @@ def add_color_nodes_to_graph(obs: Dict, with_attributes: bool = True) -> nx.Grap
     :return: graph_nx: new graph of current state and color nodes
     """
     graph_nx = create_graph_from_observation(obs, with_attributes)
-    num_original_nodes = len(list(obs['nodes_id']))
+    num_original_nodes = len(obs['nodes_id'].tolist())
     extra_nodes = [i for i in range(num_original_nodes, num_original_nodes + len(obs["used_colors"]) + 1)]
     # create node position
     delta_pos = 2 / (len(obs["used_colors"]) + 1)

@@ -1,6 +1,7 @@
 # basic imports
 from pathlib import Path
 from typing import Dict, Tuple
+import time
 # nn imports
 import torch
 # our imports
@@ -33,7 +34,7 @@ class PPOPolicy:
 
     def __call__(self, state: Dict, env: GraphOnlyColorsWrapper) -> Tuple:
         """
-        This function calls the policy network after converting the state to a torch geometric grpah and returns the
+        This function calls the policy network after converting the state to a torch geometric graph and returns the
         action chosen (after the action is converted into a simulation action)
         :param state: Dict of the current state
         :param env: Simulation wrapper, this is used only for converting the current state to the torch geometric state

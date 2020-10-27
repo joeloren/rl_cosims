@@ -147,12 +147,11 @@ class GraphOnlyColorsWrapper(Wrapper):
         illegal_actions: [n_edges, 1] , boolean vector where True: action is illegal , False: action is feasible
         """
         original_graph_nx = create_graph_from_observation(obs, True)
-        nodes_not_colored_id = [i for i in range(len(obs["node_colors"])) if obs["node_colors"][i] == -1]
+        nodes_not_colored_id = np.where(obs['node_colors'] < 0)[0].tolist()
         num_nodes_not_colored = len(nodes_not_colored_id)
         num_color_nodes = len(obs["used_colors"]) + 1  # number of colors used + extra color
-        graph_nodes = [i for i in range(num_nodes_not_colored + num_color_nodes)]
         # add color feature
-        color_node_features = np.zeros(shape=(num_color_nodes, 2))  # we have 2 features , color and indocator
+        color_node_features = np.zeros(shape=(num_color_nodes, 2))  # we have 2 features , color and indicator
         color_node_features[:, 0] = 1  # indicators are 1 for colors
         real_node_features = np.zeros(shape=(num_nodes_not_colored, 2))
         real_node_features[:, 1] = -1  # color of all uncolored nodes in graph is -1
@@ -167,25 +166,21 @@ class GraphOnlyColorsWrapper(Wrapper):
         # add edges based on color constraints
         edge_indexes = []
         for i_n, n in enumerate(nodes_not_colored_id):
-            if original_graph_nx.nodes('color')[n] == -1:
-                allowed_colors = deepcopy(colors_for_color_node)
-                for n_neighbor in original_graph_nx.neighbors(n):
-                    neighbor_color = original_graph_nx.nodes('color')[n_neighbor]
-                    if neighbor_color != -1 and neighbor_color in allowed_colors:
-                        allowed_colors.remove(neighbor_color)
-                for c in allowed_colors:
-                    edge_indexes.append((i_n, int(c) + num_nodes_not_colored))
+            allowed_colors = deepcopy(colors_for_color_node)
+            for n_neighbor in original_graph_nx.neighbors(n):
+                neighbor_color = original_graph_nx.nodes('color')[n_neighbor]
+                if neighbor_color != -1 and neighbor_color in allowed_colors:
+                    allowed_colors.remove(neighbor_color)
+            for c in allowed_colors:
+                edge_indexes.append((i_n, int(c) + num_nodes_not_colored))
         undirected_edge_indexes = [(j, i) for i, j in edge_indexes]
         num_directed_edges = len(edge_indexes)
         edge_indexes = edge_indexes + undirected_edge_indexes
-        graph_nx = nx.DiGraph()
-        graph_nx.add_nodes_from(graph_nodes)
-        graph_nx.add_edges_from(edge_indexes)
         # create directed graph from original graph
-        graph_tg = tg.utils.from_networkx(graph_nx)
-        # save node features as x tensor
-        graph_tg.x = torch.tensor(node_features_array, dtype=torch.float32)
-        # save edge features as tensor
+        node_features_tensor = torch.tensor(node_features_array, dtype=torch.float32)
+        edge_index_tensor = torch.tensor(edge_indexes, dtype=torch.long, device=node_features_tensor.device)
+        edge_index_tensor = edge_index_tensor.transpose(0, 1)
+        graph_tg = tg.data.Data(x=node_features_tensor, edge_index=edge_index_tensor)
         edge_features = np.zeros(shape=(graph_tg.edge_index.shape[1], 1))
         # this is an indicator that these edges are illegal (no need to chose the same edge twice)
         edge_features[num_directed_edges:] = 1
@@ -195,7 +190,7 @@ class GraphOnlyColorsWrapper(Wrapper):
         graph_tg.illegal_actions = graph_tg.edge_attr.view(-1).to(dtype=torch.bool)
         graph_tg.u = torch.tensor([[0]], dtype=torch.float32, device=graph_tg.x.device)
         self.action_to_simulation_action_dict = {i: (nodes_not_colored_id[u], v) for i, (u, v) in
-                                                 enumerate(graph_nx.edges()) if u < num_nodes_not_colored}
+                                                 enumerate(edge_indexes) if u < num_nodes_not_colored}
         self.node_to_color_dict = {i: c for i, c in enumerate(node_features_array[:, 1])}
         return graph_tg
 
