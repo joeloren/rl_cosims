@@ -46,9 +46,11 @@ def evaluate_policy_simple(problems: Dict[int, Env], policy: Callable[[Dict, Sim
         all_rewards.append(mean_reward)
         if save_solution:
             saved_solution = deepcopy(problem.current_state.graph)
-            plt.figure()
-            plot_gc_solution(graph=problem.current_state.graph, nodes_order=problem.current_state.nodes_order)
-            plt.title(f"graph for policy:{policy_name}, reward:{-mean_reward:.1f}")
+            if len(problem.current_state.nodes_order) < 200:  # only plot solution if the number of nodes is smaller
+                # than 200, to not overload the computer
+                plt.figure()
+                plot_gc_solution(graph=problem.current_state.graph, nodes_order=problem.current_state.nodes_order)
+                plt.title(f"graph for policy:{policy_name}, reward:{-mean_reward:.1f}")
             # plt.show()
         i += 1
     return all_rewards, saved_solution
@@ -85,10 +87,10 @@ def main():
     parser.add_argument("--problem_path", type=str,
                         default="gc_experimentation/saved_problems/er_offline/er_offline.json")
     parser.add_argument("--ppo_model_folder", type=str, help="folder where ppo model is saved",
-                        default="gc_experimentation/saved_problems/er_offline/ppo_models/2020-10-25_11_37_07")
+                        default="gc_experimentation/saved_problems/er_offline/ppo_models/15n_2020-10-25_11_37_07")
     parser.add_argument("--start_seed", type=int, default=0)
     parser.add_argument("--num_seeds", type=int, default=20)
-    parser.add_argument("--output_file", type=str, default="gc_experimentation/saved_problems/fixed/results.json")
+    parser.add_argument("--output_file", type=str, default="gc_experimentation/saved_problems/er_offline/results.json")
     parser.add_argument("--update_results", action="store_true", help="update the existing json files with new results")
 
     args = parser.parse_args()
@@ -146,7 +148,7 @@ def main():
     plt.show()
     with open(args.output_file, "w") as f:
         json.dump(values, f, indent=4)
-    plot_multiple_result_stats(policy_values=values, relative_to='OrTools')
+    plot_multiple_result_stats(policy_values=values, relative_to='Random W/O new color')
 
 
 if __name__ == "__main__":

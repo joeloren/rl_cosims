@@ -200,3 +200,43 @@ def test_add_colors_graph():
         # make sure colored graph has the correct number of nodes added (should be number of used colors + 1)
         assert num_colors_color_graph == num_colors_used + 1
 
+
+def test_color_adjacency_matrix():
+    sim = create_er_random_graph_problem(num_new_nodes=0, num_initial_nodes=8, prob_edge=0.4,
+                                         is_online=False, random_seed=0)
+    sim.seed(10)
+    obs = sim.reset()
+    action = random_policy_without_newcolor(obs, sim)
+    num_edges_to_node_zero = np.sum(sim.current_state.colors_adjacency_matrix[:, 0] == -1)
+    obs, reward, is_done, _ = sim.step(action)
+    num_colored_nodes = np.sum(sim.current_state.colors_adjacency_matrix[:, action[0]] == 0)
+    # make sure the correct amount of nodes was changed from -1 to 0
+    assert num_edges_to_node_zero == num_colored_nodes
+    # make sure column was not changed (since the column indicates all the colors of the nodes that this node is
+    # connected to)
+    assert num_edges_to_node_zero == np.sum(sim.current_state.colors_adjacency_matrix[action[0], :] == -1)
+    while not is_done:
+        action = random_policy_without_newcolor(obs, sim)
+        obs, reward, is_done, _ = sim.step(action)
+        graph_nx = create_graph_from_observation(obs)
+        colors_graph_nx = add_color_nodes_to_graph(obs)
+        # make sure color graph has the correct number of nodes
+        assert len(graph_nx.nodes()) + len(obs["used_colors"]) + 1 == len(colors_graph_nx.nodes())
+        num_colors_used = len(obs["used_colors"])
+        num_colors_color_graph = len(colors_graph_nx.nodes()) - len(graph_nx.nodes())
+        # make sure colored graph has the correct number of nodes added (should be number of used colors + 1)
+        assert num_colors_color_graph == num_colors_used + 1
+    # make sure the matrix was completely changed from -1 to a color
+    adj_matrix = sim.current_state.colors_adjacency_matrix
+    num_nodes_not_colored = np.sum(adj_matrix == -1)
+    assert num_nodes_not_colored == 0
+    # make sure no wrong color was added by accident
+    num_nodes_wrong_color = np.sum((adj_matrix > len(obs["used_colors"])-1))
+    assert num_nodes_wrong_color == 0
+    # make sure each node (column) has only one color that is not in the set of neighbor colors
+    for r in range(adj_matrix.shape[0]):
+        if np.sum(adj_matrix[:, r] == -9999) != adj_matrix.shape[0]:
+            node_color = adj_matrix[adj_matrix[:, r] != -9999, r]
+            assert np.all(node_color == node_color[0])
+            neighbor_colors = adj_matrix[r, adj_matrix[r, :] != -9999]
+            assert set(node_color) not in set(neighbor_colors)

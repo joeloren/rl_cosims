@@ -14,13 +14,16 @@ class State:
     """
     unique_colors: Set[int]  # this is a set of unique colors already used in the graph
     graph: nx.Graph  # this represents in the graph using network x representation
-    num_colored_nodes: int  # number of colored nodes so far
-    nodes_order: List  # list of the order the nodes were chosen
-    current_time: int  # the current simulation time
     # each node in the graph has :
     #   - color : the color of the node (default is -1)
     #   - open_time: time when node starts to be visible (in offline problem all start_time is 0)
     # each edge has a weight (assuming for now all edges have the same weight)
+    num_colored_nodes: int  # number of colored nodes so far
+    nodes_order: List  # list of the order the nodes were chosen
+    current_time: int  # the current simulation time
+    # this is an adjacency matrix where A[i, j] = -9999 if nodes (i, j) are not adjacent,
+    # otherwise A[i, j] = color of node j (we will use this to check all of i's neighbors and see what their colors are)
+    colors_adjacency_matrix: np.array
 
 
 class Simulator(Env):
@@ -43,7 +46,7 @@ class Simulator(Env):
         super().__init__()
         # initial state is empty data variables if self.reset() is not called
         self.initial_state: State = State(unique_colors=set(), graph=nx.Graph(), num_colored_nodes=0,
-                                          nodes_order=[], current_time=0)
+                                          nodes_order=[], current_time=0, colors_adjacency_matrix=np.array([[]]))
         # current state of the simulation, this is updated at every step() call
         self.current_state: State = deepcopy(self.initial_state)
         self.problem_generator = problem_generator  # during reset this will generate a new instance of state
@@ -53,9 +56,15 @@ class Simulator(Env):
         self.current_reward = 0.0  # this is needed so that we can calculate the current difference in the reward
         # nodes_id - the id of each node in the graph
         # TODO : add edges to observation dictionary
-        # nodes_colors - for each node this is the color it is drawn with (-1 means the node has not been colored yet)
-        # used_color_ids - this is a bool vector if color is used or not
+        # edge_indexes: List[Tuple] - edge index tuples where each tuple (i, j) is an edge between nodes i and j
+        # current_time: int - current simulation time
+        # nodes_colors: np.array [n_nodes, 1] -  for each node this is the color it is drawn with
+        # (-1 means the node has not been colored yet)
+        # used_color_ids: set - this is a bool vector if color is used or not
         # (0 - not used, 1 - used at least once in the graph)
+        # nodes_start_time: np.array [n_nodes, 1] - start time for each node
+        # color_adjacency_matrix: np.array [n_nodes, n_nodes] - this is an array where A[i, j] = -inf if there is no
+        # edge between nodes i and j, and A[i, j] = node j color otherwise
         obs_spaces = {
             "nodes_id": spaces.Box(low=0, high=self.num_max_nodes, shape=(self.num_max_nodes,), dtype=np.int32),
             "edge_indexes": spaces.Box(low=0, high=self.num_max_nodes, shape=(self.num_max_nodes, 2), dtype=np.int32),
@@ -63,6 +72,8 @@ class Simulator(Env):
             "nodes_color": spaces.Box(low=-1, high=self.num_max_nodes, shape=(self.num_max_nodes,), dtype=np.int32),
             "used_color_ids": spaces.Box(low=0, high=self.num_max_nodes, shape=(self.num_max_nodes,), dtype=np.bool),
             "nodes_start_time": spaces.Box(low=0, high=self.num_max_nodes, shape=(self.num_max_nodes,), dtype=np.int32),
+            "color_adjacency_matrix": spaces.Box(low=-np.inf, high=self.num_max_nodes,
+                                                 shape=(self.num_max_nodes, self.num_max_nodes), dtype=np.int32)
         }
         self.observation_space = spaces.Dict(obs_spaces)
 
@@ -108,6 +119,8 @@ class Simulator(Env):
             self.current_state.unique_colors.add(color_chosen)
         self.current_state.num_colored_nodes += 1
         self.current_state.nodes_order.append(node_chosen)
+        colors_adj_matrix_update = np.where(self.current_state.colors_adjacency_matrix[:, node_chosen] == -1)[0]
+        self.current_state.colors_adjacency_matrix[colors_adj_matrix_update, node_chosen] = color_chosen
         reward = -len(self.current_state.unique_colors)
         # calculate the added reward in the current step
         reward_diff = reward - self.current_reward
@@ -151,7 +164,8 @@ class Simulator(Env):
             'edge_indexes': list(self.current_state.graph.edges),
             'current_time': self.current_time,
             'nodes_start_time': node_start_times,
-            'node_positions': node_positions
+            'node_positions': node_positions,
+            'color_adjacency_matrix': self.current_state.colors_adjacency_matrix
         }
         return obs
 
