@@ -146,49 +146,53 @@ class GraphOnlyColorsWrapper(Wrapper):
         edge_attribute: edge features [n_edges, n_features]
         illegal_actions: [n_edges, 1] , boolean vector where True: action is illegal , False: action is feasible
         """
-        nodes_not_colored_id = np.where(obs['node_colors'] < 0)[0].tolist()
-        num_nodes_not_colored = len(nodes_not_colored_id)
-        num_color_nodes = len(obs["used_colors"]) + 1  # number of colors used + extra color
-        # add color feature
-        color_node_features = np.zeros(shape=(num_color_nodes, 2))  # we have 2 features , color and indicator
-        color_node_features[:, 0] = 1  # indicators are 1 for colors
-        real_node_features = np.zeros(shape=(num_nodes_not_colored, 2))
-        real_node_features[:, 1] = -1  # color of all uncolored nodes in graph is -1
-        colors_for_color_node = deepcopy(obs["used_colors"])
-        if len(obs["used_colors"]):
-            new_color_index = 1 + max(obs["used_colors"])
+        if sum(obs["node_colors"] != -1) == len(obs["nodes_id"]):
+            graph_tg = tg.data.Data(x=torch.tensor([]), edge_index=torch.tensor([], dtype=torch.long),
+                                    u=torch.tensor([]), edge_attr=torch.tensor([]))
         else:
-            new_color_index = 0
-        colors_for_color_node.add(new_color_index)
-        color_node_features[:, 1] = np.array(list(colors_for_color_node))  # first feature is the node color
-        node_features_array = np.concatenate([real_node_features, color_node_features])  # full feature matrix
-        edge_indexes = []
-        for i_n, n in enumerate(nodes_not_colored_id):
-            allowed_colors = deepcopy(colors_for_color_node)
-            neighbor_colors = obs["color_adjacency_matrix"][n, obs["color_adjacency_matrix"][n, :] != -9999]
-            allowed_colors = allowed_colors - set(neighbor_colors)
-            for c in allowed_colors:
-                edge_indexes.append((i_n, int(c) + num_nodes_not_colored))
-        # assert set(edge_indexes) == set(new_edge_indexes)
-        undirected_edge_indexes = [(j, i) for i, j in edge_indexes]
-        num_directed_edges = len(edge_indexes)
-        edge_indexes = edge_indexes + undirected_edge_indexes
-        # create directed graph from original graph
-        node_features_tensor = torch.tensor(node_features_array, dtype=torch.float32)
-        edge_index_tensor = torch.tensor(edge_indexes, dtype=torch.long, device=node_features_tensor.device)
-        edge_index_tensor = edge_index_tensor.transpose(0, 1)
-        graph_tg = tg.data.Data(x=node_features_tensor, edge_index=edge_index_tensor)
-        edge_features = np.zeros(shape=(graph_tg.edge_index.shape[1], 1))
-        # this is an indicator that these edges are illegal (no need to chose the same edge twice)
-        edge_features[num_directed_edges:] = 1
-        graph_tg.edge_attr = torch.tensor(edge_features, dtype=torch.float32, device=graph_tg.x.device)
-        # save illegal actions tensor
-        # in this case all edges are legal so we remove only the ones that are in the other direction
-        graph_tg.illegal_actions = graph_tg.edge_attr.view(-1).to(dtype=torch.bool)
-        graph_tg.u = torch.tensor([[0]], dtype=torch.float32, device=graph_tg.x.device)
-        self.action_to_simulation_action_dict = {i: (nodes_not_colored_id[u], v) for i, (u, v) in
-                                                 enumerate(edge_indexes) if u < num_nodes_not_colored}
-        self.node_to_color_dict = {i: c for i, c in enumerate(node_features_array[:, 1])}
+            nodes_not_colored_id = np.where(obs['node_colors'] < 0)[0].tolist()
+            num_nodes_not_colored = len(nodes_not_colored_id)
+            num_color_nodes = len(obs["used_colors"]) + 1  # number of colors used + extra color
+            # add color feature
+            color_node_features = np.zeros(shape=(num_color_nodes, 2))  # we have 2 features , color and indicator
+            color_node_features[:, 0] = 1  # indicators are 1 for colors
+            real_node_features = np.zeros(shape=(num_nodes_not_colored, 2))
+            real_node_features[:, 1] = -1  # color of all uncolored nodes in graph is -1
+            colors_for_color_node = deepcopy(obs["used_colors"])
+            if len(obs["used_colors"]):
+                new_color_index = 1 + max(obs["used_colors"])
+            else:
+                new_color_index = 0
+            colors_for_color_node.add(new_color_index)
+            color_node_features[:, 1] = np.array(list(colors_for_color_node))  # first feature is the node color
+            node_features_array = np.concatenate([real_node_features, color_node_features])  # full feature matrix
+            edge_indexes = []
+            for i_n, n in enumerate(nodes_not_colored_id):
+                allowed_colors = deepcopy(colors_for_color_node)
+                neighbor_colors = obs["color_adjacency_matrix"][n, obs["color_adjacency_matrix"][n, :] != -9999]
+                allowed_colors = allowed_colors - set(neighbor_colors)
+                for c in allowed_colors:
+                    edge_indexes.append((i_n, int(c) + num_nodes_not_colored))
+            # assert set(edge_indexes) == set(new_edge_indexes)
+            undirected_edge_indexes = [(j, i) for i, j in edge_indexes]
+            num_directed_edges = len(edge_indexes)
+            edge_indexes = edge_indexes + undirected_edge_indexes
+            # create directed graph from original graph
+            node_features_tensor = torch.tensor(node_features_array, dtype=torch.float32)
+            edge_index_tensor = torch.tensor(edge_indexes, dtype=torch.long, device=node_features_tensor.device)
+            edge_index_tensor = edge_index_tensor.transpose(0, 1)
+            graph_tg = tg.data.Data(x=node_features_tensor, edge_index=edge_index_tensor)
+            edge_features = np.zeros(shape=(graph_tg.edge_index.shape[1], 1))
+            # this is an indicator that these edges are illegal (no need to chose the same edge twice)
+            edge_features[num_directed_edges:] = 1
+            graph_tg.edge_attr = torch.tensor(edge_features, dtype=torch.float32, device=graph_tg.x.device)
+            # save illegal actions tensor
+            # in this case all edges are legal so we remove only the ones that are in the other direction
+            graph_tg.illegal_actions = graph_tg.edge_attr.view(-1).to(dtype=torch.bool)
+            graph_tg.u = torch.tensor([[0]], dtype=torch.float32, device=graph_tg.x.device)
+            self.action_to_simulation_action_dict = {i: (nodes_not_colored_id[u], v) for i, (u, v) in
+                                                     enumerate(edge_indexes) if u < num_nodes_not_colored}
+            self.node_to_color_dict = {i: c for i, c in enumerate(node_features_array[:, 1])}
         return graph_tg
 
     def reset(self):

@@ -72,7 +72,7 @@ def main():
     problem_name = 'gc'
     problem_type = 'er_offline'
     num_new_nodes = 0
-    num_initial_nodes = 100
+    num_initial_nodes = 15
     prob_edge = 0.3
     is_online = False
     random_seed = 0
@@ -118,10 +118,11 @@ def main():
         'lr': 0.0001,
         'discount': 0.95,
         # number of episodes to do altogether
-        'number_of_episodes': 50025,
+        'number_of_episodes': 50000,
         # a batch is N episodes where N is number_of_episodes_in_batch
-        'number_of_episodes_in_batch': 15,  # this must be a division of number of episodes
+        'number_of_episodes_in_batch': 40,  # this must be a division of number of episodes
         'total_num_eval_seeds': 100,
+        'minibatch_size': 100,
         'num_eval_seeds': 10,
         'evaluate_every': 50,
         'num_train_seeds': 100,
@@ -171,7 +172,7 @@ def main():
                 baseline: {int(seed): val for seed, val in baseline_dict.items()
                            } for baseline, baseline_dict in baseline_values.items()
             }
-
+    model_config['logit_normalizer'] = agent_config['logit_normalizer']
     model = PolicyModel(cfg=model_config, model_name='ppo_policy_model')
     set_seeds()
     if use_trains:
