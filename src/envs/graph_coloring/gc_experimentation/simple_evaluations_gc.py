@@ -46,9 +46,11 @@ def evaluate_policy_simple(problems: Dict[int, Env], policy: Callable[[Dict, Sim
         all_rewards.append(mean_reward)
         if save_solution:
             saved_solution = deepcopy(problem.current_state.graph)
-            plt.figure()
-            plot_gc_solution(graph=problem.current_state.graph, nodes_order=problem.current_state.nodes_order)
-            plt.title(f"graph for policy:{policy_name}, reward:{-mean_reward:.1f}")
+            if len(problem.current_state.nodes_order) < 200:  # only plot solution if the number of nodes is smaller
+                # than 200, to not overload the computer
+                plt.figure()
+                plot_gc_solution(graph=problem.current_state.graph, nodes_order=problem.current_state.nodes_order)
+                plt.title(f"graph for policy:{policy_name}, reward:{-mean_reward:.1f}")
             # plt.show()
         i += 1
     return all_rewards, saved_solution
