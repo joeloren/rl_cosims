@@ -146,7 +146,6 @@ class GraphOnlyColorsWrapper(Wrapper):
         edge_attribute: edge features [n_edges, n_features]
         illegal_actions: [n_edges, 1] , boolean vector where True: action is illegal , False: action is feasible
         """
-        original_graph_nx = create_graph_from_observation(obs, True)
         nodes_not_colored_id = np.where(obs['node_colors'] < 0)[0].tolist()
         num_nodes_not_colored = len(nodes_not_colored_id)
         num_color_nodes = len(obs["used_colors"]) + 1  # number of colors used + extra color
@@ -163,16 +162,14 @@ class GraphOnlyColorsWrapper(Wrapper):
         colors_for_color_node.add(new_color_index)
         color_node_features[:, 1] = np.array(list(colors_for_color_node))  # first feature is the node color
         node_features_array = np.concatenate([real_node_features, color_node_features])  # full feature matrix
-        # add edges based on color constraints
         edge_indexes = []
         for i_n, n in enumerate(nodes_not_colored_id):
             allowed_colors = deepcopy(colors_for_color_node)
-            for n_neighbor in original_graph_nx.neighbors(n):
-                neighbor_color = original_graph_nx.nodes('color')[n_neighbor]
-                if neighbor_color != -1 and neighbor_color in allowed_colors:
-                    allowed_colors.remove(neighbor_color)
+            neighbor_colors = obs["color_adjacency_matrix"][n, obs["color_adjacency_matrix"][n, :] != -9999]
+            allowed_colors = allowed_colors - set(neighbor_colors)
             for c in allowed_colors:
                 edge_indexes.append((i_n, int(c) + num_nodes_not_colored))
+        # assert set(edge_indexes) == set(new_edge_indexes)
         undirected_edge_indexes = [(j, i) for i, j in edge_indexes]
         num_directed_edges = len(edge_indexes)
         edge_indexes = edge_indexes + undirected_edge_indexes

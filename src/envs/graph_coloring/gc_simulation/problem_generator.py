@@ -46,6 +46,9 @@ class FixedGraphGenerator(ScenarioGenerator):
         #   - color : the color of the node (default is -1)
         #   - open_time: time when node starts to be visible (in offline problem all start_time is 0)
         #   - pos : position of nodes, used for drawing graph
+        adjacency_matrix = nx.linalg.graphmatrix.adjacency_matrix(self.graph).toarray()
+        adjacency_matrix[adjacency_matrix == 0] = -9999
+        self.adjacency_matrix = adjacency_matrix
 
     def seed(self, seed: int) -> None:
         pass
@@ -65,7 +68,8 @@ class FixedGraphGenerator(ScenarioGenerator):
                       graph=deepcopy(self.graph),
                       num_colored_nodes=0,
                       nodes_order=[],
-                      current_time=0)
+                      current_time=0,
+                      colors_adjacency_matrix=deepcopy(self.adjacency_matrix))
         return state
 
 
@@ -117,16 +121,30 @@ class ERGraphGenerator(ScenarioGenerator):
             current_state.graph.add_node(num_node_to_add, color=-1, start_time=current_state.current_time,
                                          pos=np.array([np.random.uniform(-1, 1, 1), np.random.uniform(-1, 1, 1)]))
             # go over all other nodes and graph and see if edge needs to be added
+            new_adjacency_row = np.zeros(shape=num_node_to_add) - 9999
+            new_adjacency_column = np.zeros(shape=num_node_to_add) - 9999
             for n in current_state.graph.nodes():
                 if np.random.random() > self.prob_edge:
                     current_state.graph.add_edge(num_node_to_add, n)
                     current_state.graph.add_edge(n, num_node_to_add)  # add edge in other direction
+                    # add color_adjacency_matrix value to the last row of the matrix
+                    new_adjacency_row[n] = current_state.graph.nodes('color')[n]
+            new_color_adjacency_matrix = np.zeros(shape=(num_node_to_add, num_node_to_add))
+            new_color_adjacency_matrix[:-1, :-1] = current_state.colors_adjacency_matrix
+            new_color_adjacency_matrix[-1, :] = new_adjacency_row
+            new_color_adjacency_matrix[:, -1] = new_adjacency_column
+            current_state.colors_adjacency_matrix = new_color_adjacency_matrix
         return current_state
 
     def reset(self) -> State:
+        graph = self.create_new_graph()
+        adjacency_matrix = nx.linalg.graphmatrix.adjacency_matrix(graph).toarray()
+        adjacency_matrix[adjacency_matrix == 0] = -9999
+        adjacency_matrix[adjacency_matrix == 1] = -1
         state = State(unique_colors=set(),
-                      graph=self.create_new_graph(),
+                      graph=graph,
                       num_colored_nodes=0,
                       nodes_order=[],
-                      current_time=0)
+                      current_time=0,
+                      colors_adjacency_matrix=adjacency_matrix)
         return state
