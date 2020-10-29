@@ -122,7 +122,7 @@ def main():
         # a batch is N episodes where N is number_of_episodes_in_batch
         'number_of_episodes_in_batch': 40,  # this must be a division of number of episodes
         'total_num_eval_seeds': 100,
-        'minibatch_size': 4,
+        'minibatch_size': 2,
         'num_eval_seeds': 10,
         'evaluate_every': 50,
         'num_train_seeds': 100,
