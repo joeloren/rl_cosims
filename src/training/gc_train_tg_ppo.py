@@ -12,7 +12,7 @@ from src.envs.graph_coloring.gc_baselines.ortools_policy import ORToolsOfflinePo
 from src.envs.graph_coloring.gc_baselines.simple_policies import random_policy_without_newcolor
 # import gc simulation -
 from src.envs.graph_coloring.gc_simulation.simulator import Simulator
-from src.envs.graph_coloring.gc_wrappers.gc_torch_geometric_wrappers import GraphOnlyColorsWrapper
+from src.envs.graph_coloring.gc_wrappers.gc_torch_geometric_wrappers import GraphWithColorsWrapper
 # import problem creator
 from src.envs.graph_coloring.gc_experimentation.problems import (create_fixed_static_problem,
                                                                  create_er_random_graph_problem)
@@ -89,7 +89,7 @@ def main():
     env = create_er_random_graph_problem(num_new_nodes=num_new_nodes, num_initial_nodes=num_initial_nodes,
                                          prob_edge=prob_edge, is_online=is_online, random_seed=random_seed)
 
-    env_tg = GraphOnlyColorsWrapper(env)
+    env_tg = GraphWithColorsWrapper(env)
     env_tg.reset()
 
     model_config = {
@@ -122,7 +122,7 @@ def main():
         # a batch is N episodes where N is number_of_episodes_in_batch
         'number_of_episodes_in_batch': 40,  # this must be a division of number of episodes
         'total_num_eval_seeds': 100,
-        'minibatch_size': 100,
+        'minibatch_size': 4,
         'num_eval_seeds': 10,
         'evaluate_every': 50,
         'num_train_seeds': 100,

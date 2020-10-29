@@ -11,10 +11,9 @@ import torch
 import torch.nn.functional as F
 import torch.optim as optim
 from pathlib import Path
-from torch.distributions import Categorical
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.utils.tensorboard import SummaryWriter
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Optional
 
 from src.models.tg_models import PolicyGNN
 from src.training.torch_utils import get_available_device
@@ -114,13 +113,12 @@ class PPOAgent:
         self.reset_game()
         loss = 0
         while not self.done:
-            # print(f'calculating episode {self.episode_number},  step:{self.episode_step_number}')
+            # print(f"calculating episode {self.episode_number},  step:{self.episode_step_number}")
             self.episode_step()
             # self.update_next_state_reward_done_and_score()
             # TODO need to update time_to_learn to be based on number of batches
             if self.time_to_learn():
                 loss = self.learn()
-
             self.state = self.next_state  # this is to set the state for the next iteration
             self.episode_step_number += 1
         self.episode_number += 1
@@ -175,21 +173,18 @@ class PPOAgent:
 
     def learn(self):
         """Runs a learning iteration for the policy"""
-        total_num_steps = len(self.batch_rtgs)
         self.old_policy.load_state_dict(self.policy.state_dict())
         start_time = time.time()
         total_loss = 0
         for i in range(self.n_ppo_updates):
             self.optimizer.zero_grad()
-            total_loss, chosen_logprobs_train, mean_kl = self.compute_loss()
-            sliding_average_total_reward = -np.mean(self.total_rewards_window)
-            total_loss.backward()
+            total_loss, mean_kl = self.compute_loss()
             self.optimizer.step()
             if mean_kl >= 1.5 * self.target_kl:
                 print(f"Training: early stopping in PPO pass {i}. Reached approx. mean KL: {mean_kl}")
                 break
         print(f'Total time for all PPO updates: {time.time() - start_time}s')
-         # self.lr_scheduler.step(sliding_average_total_reward)
+        # self.lr_scheduler.step(sliding_average_total_reward)
         # add things to tb and evaluate if needed -
         if (self.episode_number + 1) % 40 == 0:
             print(
@@ -203,8 +198,6 @@ class PPOAgent:
         self.writer.add_scalar('Train/Reward', sum(self.episode_rewards), self.episode_number)
         self.writer.add_scalar('Train/lr', self.optimizer.state_dict()['param_groups'][0]['lr'], self.episode_number)
         self.writer.add_scalar('Train/AverageLogProb_data_collection', torch.mean(torch.tensor(self.batch_log_probs)),
-                               self.episode_number)
-        self.writer.add_scalar('Train/AverageLogProb_train', torch.mean(torch.tensor(chosen_logprobs_train)),
                                self.episode_number)
         self.writer.add_scalar('Train/MinRTGs', torch.min(torch.tensor(self.batch_rtgs)), self.episode_number)
         self.writer.add_scalar('Train/MaxRTGs', torch.max(torch.tensor(self.batch_rtgs)), self.episode_number)
@@ -233,31 +226,51 @@ class PPOAgent:
         :return: (total loss, chosen log probabilities, mean approximate kl divergence
 
         """
-        original_logprobs = torch.tensor(self.batch_log_probs).to(device="cpu").view(-1, 1)
-        batch_rtgs_tensor = torch.tensor(self.batch_rtgs, device="cpu", dtype=torch.float32).view(-1, 1)
+        total_loss = 0
+        total_mean_kl = 0
+        total_value_loss = 0
+        total_entropy_loss = 0
+        total_policy_loss = 0
+        total_mean_chosen_logprob = 0
+        number_minibatches = int(self.config['number_of_episodes_in_batch'] / self.minibatch_size)
+        full_indices = np.array((range(self.config['number_of_episodes_in_batch'])))
+        for i_m in range(number_minibatches):
+            m_indices = full_indices[i_m*self.minibatch_size: (i_m+1)*self.minibatch_size]
+            minibatch_original_log_probs = torch.tensor(self.batch_log_probs).to(device="cpu")[m_indices].view(-1, 1)
+            minibatch_rtgs_tensor = torch.tensor(self.batch_rtgs, device="cpu",
+                                                 dtype=torch.float32)[m_indices].view(-1, 1)
+            minibatch_states = [self.batch_states[i] for i in m_indices]
+            minibatch_actions = [self.batch_actions[i] for i in m_indices]
+            policy_results = self.policy.compute_probs_and_state_values(minibatch_states,
+                                                                        minibatch_actions,
+                                                                        self.device)
+            chosen_logprob, batch_probabilities, batch_state_values = policy_results
+            # add entropy for exploration
+            # Policy loss
+            batch_advantage_tensor = self.normalize_batch_advantage(minibatch_rtgs_tensor - batch_state_values.detach())
+            ratio = torch.exp(chosen_logprob - minibatch_original_log_probs)
+            base_policy_loss = ratio * batch_advantage_tensor
+            clamped_policy_loss = torch.clamp(ratio, 1 - self.eps_clip, 1 + self.eps_clip) * batch_advantage_tensor
+            policy_loss = -torch.min(base_policy_loss, clamped_policy_loss).mean()
+            total_policy_loss += policy_loss
+            # normalized_batch_advantage = self.normalize_batch_advantage(batch_advantage_tensor)
+            # Entropy loss
+            entropy_loss = -batch_probabilities.mean() * self.config['entropy_coeff']
+            total_entropy_loss += entropy_loss.detach().cpu().item()
+            value_loss = (F.mse_loss(batch_state_values, minibatch_rtgs_tensor) * self.config['value_coeff'])
+            total_value_loss += value_loss.detach().cpu().item()
+            minibatch_loss = policy_loss - entropy_loss + value_loss
+            minibatch_loss.backward()  # preform backward for each loss we calculate
+            total_loss += minibatch_loss.detach().cpu().item()
+            mean_kl = (minibatch_original_log_probs - chosen_logprob).mean().detach().cpu().item()
+            total_mean_kl += mean_kl
+        total_mean_kl = total_mean_kl / number_minibatches
 
-        policy_results = self.policy.compute_probs_and_state_values(self.batch_states, self.batch_actions, self.device)
-        chosen_logprob, batch_probabilities, batch_state_values = policy_results
-        # add entropy for exploration
-        # Policy loss
-        batch_advantage_tensor = self.normalize_batch_advantage(batch_rtgs_tensor - batch_state_values.detach())
-        ratio = torch.exp(chosen_logprob - original_logprobs)
-        base_policy_loss = ratio * batch_advantage_tensor
-        clamped_policy_loss = torch.clamp(ratio, 1 - self.eps_clip, 1 + self.eps_clip) * batch_advantage_tensor
-        policy_loss = -torch.min(base_policy_loss, clamped_policy_loss).mean()
-
-        # normalized_batch_advantage = self.normalize_batch_advantage(batch_advantage_tensor)
-        # Entropy loss
-        entropy_loss = -batch_probabilities.mean() * self.config['entropy_coeff']
-        value_loss = (F.mse_loss(batch_state_values, batch_rtgs_tensor) * self.config['value_coeff'])
-        total_loss = policy_loss + entropy_loss + value_loss
-        mean_kl = (original_logprobs - chosen_logprob).mean().detach().cpu().item()
-
-        self.writer.add_scalar('Train/Loss/value', value_loss, self.episode_number)
-        self.writer.add_scalar('Train/Loss/policy', policy_loss.mean(), self.episode_number)
-        self.writer.add_scalar('Train/Loss/entropy', entropy_loss, self.episode_number)
-        # self.writer.add_scalar('Train/Loss/total', total_loss, self.episode_number)
-        return total_loss, chosen_logprob, mean_kl
+        self.writer.add_scalar('Train/Loss/value', total_value_loss, self.episode_number)
+        self.writer.add_scalar('Train/Loss/policy', total_policy_loss, self.episode_number)
+        self.writer.add_scalar('Train/Loss/entropy', total_entropy_loss, self.episode_number)
+        self.writer.add_scalar('Train/AverageLogProb_train', total_mean_chosen_logprob, self.episode_number)
+        return total_loss, total_mean_kl
 
     def time_to_learn(self):
         """Tells us whether it is time for the algorithm to learn. With REINFORCE we only learn
@@ -292,7 +305,7 @@ class PPOAgent:
         self.writer.add_scalar('Eval/Reward per episode', mean_reward, self.episode_number)
         # save the best overall model -
         if len(self.best_overall_models) >= 1:
-            print( f"current relative:{mean_relative_diff},"
+            print(f"current relative:{mean_relative_diff},"
                    f" max relative:{max(self.best_overall_models, key=lambda x: x[0])[0]}")
         if (len(self.best_overall_models) < 3 or
                 mean_relative_diff < max(self.best_overall_models, key=lambda x: x[0])[0]):
@@ -318,7 +331,7 @@ class PPOAgent:
         self.evaluation_episodes += 1
 
     def save_model(self):
-        # print(f'saving model, episode {self.episode_number}')
+        # print(f"saving model, episode {self.episode_number}")
         dir_name = self.config['model_save_dir']
         file_name = f'model_ep_{self.episode_number}'
         torch.save(self.policy.state_dict(), Path(dir_name) / file_name)

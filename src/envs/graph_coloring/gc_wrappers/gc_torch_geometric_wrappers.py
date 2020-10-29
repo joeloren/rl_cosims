@@ -46,29 +46,74 @@ class GraphWithColorsWrapper(Wrapper):
         edge_attribute: edge features [n_edges, n_features]
         illegal_actions: [n_edges, 1] , boolean vector where True: action is illegal , False: action is feasible
         """
-        # create networkx graph of original nodes and color nodes
-        graph_nx = add_color_nodes_to_graph(obs, with_attributes=True)
-        node_features = []
-        for n, f in graph_nx.nodes(data=True):
-            node_features.append(np.array([f['indicator'], f['color']]))
-        edge_features = []
-        for u, v, f in graph_nx.edges(data=True):
-            edge_features.append(f['indicator'])
-        node_features_array = np.vstack(node_features)
-        edge_feature_array = np.vstack(edge_features)
-        # create directed graph from original graph
-        graph_tg = tg.utils.from_networkx(graph_nx)
-        # save node features as x tensor
-        graph_tg.x = torch.tensor(node_features_array, dtype=torch.float32)
-        # save edge features as tensor
-        graph_tg.edge_attr = torch.tensor(edge_feature_array, dtype=torch.float32, device=graph_tg.x.device)
+        # # create networkx graph of original nodes and color nodes
+        # graph_nx = add_color_nodes_to_graph(obs, with_attributes=True)
+        # node_features = []
+        # for n, f in graph_nx.nodes(data=True):
+        #     node_features.append(np.array([f['indicator'], f['color']]))
+        # edge_features = []
+        # for u, v, f in graph_nx.edges(data=True):
+        #     edge_features.append(f['indicator'])
+        # node_features_array = np.vstack(node_features)
+        # edge_feature_array = np.vstack(edge_features)
+        # # create directed graph from original graph
+        # graph_tg = tg.utils.from_networkx(graph_nx)
+        # # save node features as x tensor
+        # graph_tg.x = torch.tensor(node_features_array, dtype=torch.float32)
+        # # save edge features as tensor
+        # graph_tg.edge_attr = torch.tensor(edge_feature_array, dtype=torch.float32, device=graph_tg.x.device)
+
+        # get information about the real graph
+        real_nodes_id = obs['nodes_id'].tolist()
+        real_nodes_colors = obs["node_colors"]
+        num_original_nodes = len(real_nodes_id)
+        num_color_nodes = len(obs["used_colors"]) + 1
+        color_nodes_id = [i for i in range(num_original_nodes, num_original_nodes + num_color_nodes)]
+        # add color feature
+        color_node_colors = deepcopy(obs["used_colors"])
+        if len(obs["used_colors"]):
+            new_color_index = 1 + max(obs["used_colors"])
+        else:
+            new_color_index = 0
+        color_node_colors.add(new_color_index)
+        color_edge_indexes = []
+        # get allowed edges between color nodes and real graph nodes
+        for i_n, n in enumerate(real_nodes_id):
+            if real_nodes_colors[n] == -1:
+                allowed_colors = deepcopy(color_node_colors)
+                neighbor_colors = obs["color_adjacency_matrix"][n, obs["color_adjacency_matrix"][n, :] != -9999]
+                allowed_colors = allowed_colors - set(neighbor_colors)
+                for c in allowed_colors:
+                    color_edge_indexes.append((n, int(c) + num_original_nodes))
+        num_real_edges = len(obs["edge_indexes"])
+        num_color_edges = len(color_edge_indexes)
+        graph_edges = obs["edge_indexes"] + color_edge_indexes
+        # create node features for real and color nodes f[indicator, color]
+        real_node_features = np.zeros(shape=(num_original_nodes, 2))
+        real_node_features[:, 1] = real_nodes_colors
+        color_node_features = np.zeros(shape=(num_color_nodes, 2))
+        color_node_features[:, 0] = 1  # indicator of color nodes is 1
+        color_node_features[:, 1] = list(color_node_colors)
+        node_features_array = np.concatenate([real_node_features, color_node_features])
+        # create edge features for real graph edges and constraint edges f[indicator]
+        real_edge_features = np.zeros(shape=(num_real_edges, 1))
+        color_edge_features = np.ones(shape=(num_color_edges, 1))
+        edge_features_array = np.concatenate([real_edge_features, color_edge_features])
+        # convert all arrays to tensors
+        node_features_tensor = torch.tensor(node_features_array, dtype=torch.float32)
+        edge_features_tensor = torch.tensor(edge_features_array, dtype=torch.float32, device=node_features_tensor.device)
+        edge_indexes_tensor = torch.tensor(graph_edges, dtype=torch.long,
+                                           device=node_features_tensor.device).transpose(1, 0)
+        # create tg graph from data
+        graph_tg = tg.data.Data(x=node_features_tensor, edge_index=edge_indexes_tensor,
+                                edge_attr=edge_features_tensor)
         # save illegal actions tensor
         # an edge that is part of the real graph is considered illegal, therefore if indicator = 0 the edge is illegal
         # (so we take the logical_not if the indicators
         graph_tg.illegal_actions = torch.logical_not(graph_tg.edge_attr.view(-1))
         graph_tg.u = torch.tensor([[0]], dtype=torch.float32, device=graph_tg.x.device)
-        self.action_to_simulation_action_dict = {i: (u, v) for i, (u, v) in enumerate(graph_nx.edges())}
-        self.node_to_color_dict = nx.get_node_attributes(graph_nx, 'color')
+        self.action_to_simulation_action_dict = {i: (u, v) for i, (u, v) in enumerate(graph_edges)}
+        self.node_to_color_dict = {i: int(c) for i, c in enumerate(node_features_array[:, 1])}
         return graph_tg
 
     def reset(self):
