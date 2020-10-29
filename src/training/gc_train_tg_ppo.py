@@ -72,7 +72,7 @@ def main():
     problem_name = 'gc'
     problem_type = 'er_offline'
     num_new_nodes = 0
-    num_initial_nodes = 15
+    num_initial_nodes = 50
     prob_edge = 0.3
     is_online = False
     random_seed = 0
