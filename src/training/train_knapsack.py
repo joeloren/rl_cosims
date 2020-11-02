@@ -103,7 +103,8 @@ def main():
         eps_clip=0.2,
         n_ppo_updates=20,
         target_kl=0.005,
-        logit_normalizer=10)
+        logit_normalizer=10,
+        problem_name='oks')
 
     agent_config['policy_model_class'] = 'MLPActorCritic'
     if args.trains:

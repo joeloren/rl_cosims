@@ -74,7 +74,7 @@ class PPOAgent:
         run_name = config.get('run_name', '') or ''
         print('config: ')
         print(config)
-        output_dir = f'runs/ppo_agent/{run_name}/{time_str}'
+        output_dir = f"runs/{config['problem_name']}/ppo_agent/{run_name}/{time_str}"
         path = Path(output_dir)
         if not path.exists():
             path.mkdir(parents=True)
@@ -268,10 +268,10 @@ class PPOAgent:
         if not self.separate_v_opt:
             # Value loss
             value_loss = (F.mse_loss(self.policy.v(state_batch).view(-1, 1), batch_rtgs_tensor) * self.config['value_coeff'])
-            total_loss = policy_loss + entropy_loss + value_loss
+            total_loss = policy_loss - entropy_loss + value_loss
             self.writer.add_scalar('Train/Loss/value', value_loss, self.episode_number)
         else:
-            total_loss = policy_loss + entropy_loss
+            total_loss = policy_loss - entropy_loss
         mean_kl = (original_logprobs - chosen_logprob).mean().detach().cpu().item()
         self.writer.add_scalar('Train/Loss/policy', policy_loss.mean(), self.episode_number)
         self.writer.add_scalar('Train/Loss/entropy', entropy_loss, self.episode_number)
