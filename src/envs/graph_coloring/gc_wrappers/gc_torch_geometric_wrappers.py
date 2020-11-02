@@ -12,7 +12,6 @@ from gym import Wrapper
 
 # our imports
 from src.envs.graph_coloring.gc_simulation.simulator import Simulator
-from src.envs.graph_coloring.gc_utils.graph_utils import create_graph_from_observation, add_color_nodes_to_graph
 
 
 class GraphWithColorsWrapper(Wrapper):

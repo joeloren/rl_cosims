@@ -252,18 +252,20 @@ class PPOAgent:
             base_policy_loss = ratio * batch_advantage_tensor
             clamped_policy_loss = torch.clamp(ratio, 1 - self.eps_clip, 1 + self.eps_clip) * batch_advantage_tensor
             policy_loss = -torch.min(base_policy_loss, clamped_policy_loss).mean()
-            total_policy_loss += policy_loss
+            total_policy_loss += policy_loss.detach().cpu().item()
             # normalized_batch_advantage = self.normalize_batch_advantage(batch_advantage_tensor)
             # Entropy loss
             entropy_loss = -batch_probabilities.mean() * self.config['entropy_coeff']
             total_entropy_loss += entropy_loss.detach().cpu().item()
             value_loss = (F.mse_loss(batch_state_values, minibatch_rtgs_tensor) * self.config['value_coeff'])
             total_value_loss += value_loss.detach().cpu().item()
-            minibatch_loss = policy_loss - entropy_loss + value_loss
+            minibatch_loss = policy_loss + entropy_loss + value_loss
             minibatch_loss.backward()  # preform backward for each loss we calculate
             total_loss += minibatch_loss.detach().cpu().item()
             mean_kl = (minibatch_original_log_probs - chosen_logprob).mean().detach().cpu().item()
             total_mean_kl += mean_kl
+            if torch.cuda.is_available():
+                torch.cuda.synchronize()
         total_mean_kl = total_mean_kl / number_minibatches
 
         self.writer.add_scalar('Train/Loss/value', total_value_loss, self.episode_number)

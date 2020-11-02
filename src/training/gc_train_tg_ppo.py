@@ -72,7 +72,7 @@ def main():
     problem_name = 'gc'
     problem_type = 'er_offline'
     num_new_nodes = 0
-    num_initial_nodes = 50
+    num_initial_nodes = 15
     prob_edge = 0.3
     is_online = False
     random_seed = 0
@@ -122,7 +122,7 @@ def main():
         # a batch is N episodes where N is number_of_episodes_in_batch
         'number_of_episodes_in_batch': 40,  # this must be a division of number of episodes
         'total_num_eval_seeds': 100,
-        'minibatch_size': 2,
+        'minibatch_size': 40,
         'num_eval_seeds': 10,
         'evaluate_every': 50,
         'num_train_seeds': 100,
