@@ -259,6 +259,7 @@ class PPOAgent:
             total_entropy_loss += entropy_loss.detach().cpu().item()
             value_loss = (F.mse_loss(batch_state_values, minibatch_rtgs_tensor) * self.config['value_coeff'])
             total_value_loss += value_loss.detach().cpu().item()
+            total_mean_chosen_logprob += chosen_logprob.mean().detach().cpu().item()
             minibatch_loss = policy_loss + entropy_loss + value_loss
             minibatch_loss.backward()  # preform backward for each loss we calculate
             total_loss += minibatch_loss.detach().cpu().item()
