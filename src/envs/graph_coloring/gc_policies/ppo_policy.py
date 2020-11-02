@@ -53,3 +53,23 @@ class PPOPolicy:
         action = (node_chosen, color_chosen)
         return action
 
+    def get_action_and_value(self, state: Dict, env: GraphWithColorsWrapper) -> Tuple:
+        """
+            This function calls the policy network after converting the state to a torch geometric graph and returns the
+            action chosen (after the action is converted into a simulation action)
+            :param state: Dict of the current state
+            :param env: Simulation wrapper, this is used only for converting the current state to the torch geometric state
+            and also to save the dictionaries from edge to node and color chosen
+            :return: (node_chosen, color_chosen) : (int, int) node and color id chosen
+        """
+        # make sure policy is in eval mode
+        self.agent.policy.eval()
+        # convert state to torch geometric graph
+        obs_tg = self.tg_env.observation(state)
+        # select action using the agent policy network
+        policy_action, policy_logprob, policy_value = self.agent.select_action_and_log_prob(state=obs_tg)
+        # convert action from edge index to (node_id, color_chosen) so that simulation can accept the action
+        (node_chosen, color_node_chosen) = self.tg_env.action_to_simulation_action_dict[policy_action]
+        color_chosen = self.tg_env.node_to_color_dict[color_node_chosen]
+        action = (node_chosen, color_chosen)
+        return action, policy_value
