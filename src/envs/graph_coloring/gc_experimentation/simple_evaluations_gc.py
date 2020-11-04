@@ -123,7 +123,7 @@ def main():
         )
 
     if "ortools" in policies:
-        ortools_policy = ORToolsOfflinePolicy(verbose=False, timeout=500)  # timeout is in milli-seconds
+        ortools_policy = ORToolsOfflinePolicy(verbose=False, timeout=2000)  # timeout is in milli-seconds
         values["OrTools"], saved_solutions["OrTools"] = evaluate_policy_simple(envs, ortools_policy, samples_per_seed=1)
 
     expensive_policies = []
