@@ -116,7 +116,7 @@ def main():
 
     agent_config = {
         'lr': 0.0001,
-        'discount': 0.95,
+        'discount': 1.0,
         # number of episodes to do altogether
         'number_of_episodes': 50000,
         # a batch is N episodes where N is number_of_episodes_in_batch
