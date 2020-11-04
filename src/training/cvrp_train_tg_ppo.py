@@ -12,8 +12,7 @@ from trains import Task
 from src.envs.cvrp.cvrp_baselines.simple_baseline import distance_proportional_policy
 from src.envs.cvrp.cvrp_baselines.or_tools_baseline import ORToolsPolicy
 # import cvrp simulation -
-from src.envs.cvrp.cvrp_wrappers.cvrp_torch_geometric_wrapper import GeometricBidirectionalWrapper as TgWrapper
-from src.envs.cvrp.cvrp_wrappers.cvrp_torch_geometric_wrapper import ObservationNormalizationWrapper as NormWrapper
+from src.envs.cvrp.cvrp_wrappers.cvrp_torch_geometric_wrapper import GeometricFullyConnectedWrapper
 # import problem creator
 from src.envs.cvrp.cvrp_experimentation.problems import (create_uniform_dynamic_problem, create_fixed_static_problem)
 # import RL algorithm -
@@ -120,8 +119,7 @@ def main():
     # EVAL_BASELINES_RESULTS_FILENAME = (f'experiments/{3}s_{10}c_{0}t/'
     #                                    f'baseline_values.json')
 
-
-    tg_env = TgWrapper(env)
+    tg_env = GeometricFullyConnectedWrapper(env)
     tg_env.reset()
 
     model_config = {
@@ -147,12 +145,12 @@ def main():
     }
 
     agent_config = {
-        'lr': 0.0001,
-        'discount': 0.95,
+        'lr': 3e-4,
+        'discount': 0.99,
         # number of episodes to do altogether
         'number_of_episodes': 50000,
         # a batch is N episodes where N is number_of_episodes_in_batch
-        'number_of_episodes_in_batch': 20,  # this must be a division of number of episodes
+        'number_of_episodes_in_batch': 10,  # this must be a division of number of episodes
         'total_num_eval_seeds': 10,
         'num_eval_seeds': 2,
         'evaluate_every': 50,
@@ -162,12 +160,13 @@ def main():
         'value_coeff': 0.3,
         'model_config': model_config,
         'save_checkpoint_every': 1000,
-        'eps_clip': 0.5,
+        'eps_clip': 0.2,
         'n_ppo_updates': 20,
         'target_kl': 0.005,
         'logit_normalizer': 10,
         'problem_name': problem_name  # used for saving results
     }
+    model_config['logit_normalizer'] = agent_config['logit_normalizer']
     agent_config['run_name'] = f"ep_in_batch_{agent_config['number_of_episodes_in_batch']}_" \
                                f"n_eval_{agent_config['num_eval_seeds']}_lr_{agent_config['lr']}"
     eval_seeds = list(range(agent_config['total_num_eval_seeds']))

@@ -13,7 +13,6 @@ class State:
     environment (including
     customers that are not known to the agent)
     """
-
     depot_position: np.ndarray  # x,y
     current_vehicle_position: np.ndarray  # x,y
     current_vehicle_capacity: int
@@ -133,13 +132,11 @@ class CVRPSimulation(Env):
             self.current_state.customer_visited[customer_index] = True
             self.current_state.current_vehicle_position = customer_position
             self.current_state.current_vehicle_capacity -= customer_demand
-
         # find if the simulation is over
         is_done = self.calculate_is_complete()
         # if simulation is done, add returning to depot to reward
         if is_done:
-            # to do if in the future we want to update the reward to include time, this also needs
-            #  to be updated
+            # to do if in the future we want to update the reward to include time, this also needs to be updated
             traveled_distance += np.linalg.norm(self.current_state.current_vehicle_position -
                                                 self.current_state.depot_position)
         # next time is found based on: delta_time = travel_distance * vehicle_velocity  (t = v*x)
@@ -218,9 +215,7 @@ class CVRPSimulation(Env):
                 # find customer index based on masked customers
                 masked_options = self.get_masked_options(opened_customers_ids)
                 if masked_options[action_index]:
-                    customer_index = opened_customers_ids[
-                        action_index
-                    ]  # find customer from id matrix
+                    customer_index = opened_customers_ids[action_index]  # find customer from id matrix
                 else:
                     # the customer chosen is not available (action should have been masked)
                     raise Exception(f"tried to move to customer that is not available ,  "
@@ -285,52 +280,31 @@ class CVRPSimulation(Env):
         customer_positions[:n_opened_customers, ...] = np.copy(
             copy_env.current_state.customer_positions[:n_opened_customers, ...]
         )
-        customer_times[:n_opened_customers] = np.copy(
-            copy_env.current_state.customer_times[:n_opened_customers]
-        )
-        customer_demands[:n_opened_customers] = np.copy(
-            copy_env.current_state.customer_demands[:n_opened_customers]
-        )
-        customer_visited[:n_opened_customers] = np.copy(
-            copy_env.current_state.customer_visited[:n_opened_customers]
-        )
+        customer_times[:n_opened_customers] = np.copy(copy_env.current_state.customer_times[:n_opened_customers])
+        customer_demands[:n_opened_customers] = np.copy(copy_env.current_state.customer_demands[:n_opened_customers])
+        customer_visited[:n_opened_customers] = np.copy(copy_env.current_state.customer_visited[:n_opened_customers])
         # add new customers to state
-        customer_positions[n_opened_customers:, ...] = np.copy(
-            future_customer_positions[:n_customers_to_create]
-        )
-        customer_times[n_opened_customers:, ...] = np.copy(
-            future_customer_times[:n_customers_to_create]
-        )
-        customer_demands[n_opened_customers:, ...] = np.copy(
-            future_customer_demands[:n_customers_to_create]
-        )
+        customer_positions[n_opened_customers:, ...] = np.copy(future_customer_positions[:n_customers_to_create])
+        customer_times[n_opened_customers:, ...] = np.copy(future_customer_times[:n_customers_to_create])
+        customer_demands[n_opened_customers:, ...] = np.copy(future_customer_demands[:n_customers_to_create])
         # create new initial state based on new information for future customers -
         copy_env.initial_state = State(
             depot_position=np.copy(copy_env.initial_state.depot_position),  # [x,y]
-            current_vehicle_position=np.copy(
-                copy_env.initial_state.current_vehicle_position
-            ),
-            # [x,y]
-            current_vehicle_capacity=int(
-                copy_env.initial_state.current_vehicle_capacity
-            ),
+            current_vehicle_position=np.copy(copy_env.initial_state.current_vehicle_position),  # [x,y]
+            current_vehicle_capacity=int(copy_env.initial_state.current_vehicle_capacity),
             vehicle_velocity=copy_env.initial_state.vehicle_velocity,
             customer_positions=customer_positions,  # [x,y] for each customer 0, 1,..N
             customer_demands=customer_demands.astype(int),  # [N]
             customer_times=customer_times,  # [N] this is the start time of each customer
             customer_ids=customer_ids,
-            customer_visited=np.zeros(shape=n_total_customers).astype(bool),
+            customer_visited=np.zeros(shape=n_total_customers).astype(bool)
         )
         # copy new initial state to current state  -
         copy_env.current_state = State(
             depot_position=np.copy(copy_env.current_state.depot_position),  # [x,y]
-            current_vehicle_position=np.copy(
-                copy_env.current_state.current_vehicle_position
-            ),
+            current_vehicle_position=np.copy(copy_env.current_state.current_vehicle_position),
             # [x,y]
-            current_vehicle_capacity=int(
-                copy_env.current_state.current_vehicle_capacity
-            ),
+            current_vehicle_capacity=int(copy_env.current_state.current_vehicle_capacity),
             vehicle_velocity=copy_env.current_state.vehicle_velocity,
             customer_positions=customer_positions,  # [x,y] for each customer 0, 1,..N
             customer_demands=customer_demands.astype(int),  # [N]
@@ -349,10 +323,8 @@ class CVRPSimulation(Env):
         # returns only customers that are:
         # 1. opened (start_time <= sim_current_time)
         # 2. not visited
-        time_visited = np.logical_and(
-            self.current_state.customer_times <= self.current_time,
-            np.logical_not(self.current_state.customer_visited),
-        )
+        time_visited = np.logical_and(self.current_state.customer_times <= self.current_time,
+                                      np.logical_not(self.current_state.customer_visited))
         # to do: figure out what happens when there are no available customers
         opened_customer_ids = self.current_state.customer_ids[time_visited]
         return opened_customer_ids
