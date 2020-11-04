@@ -81,5 +81,8 @@ class IdenticalMachines(Env):
         to_machine = self.random.choice(self.num_machines)
         return Action(from_machine=from_machine, job_idx=job_idx, to_machine=to_machine)
 
-
+    @staticmethod
+    def observation(obs):
+        # the simulator returns obs without any changes (used for wrappers)
+        return obs
 

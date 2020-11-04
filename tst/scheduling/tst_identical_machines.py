@@ -1,4 +1,4 @@
-from src.envs.scheduling.scheduling_envs.identical_machines import IdenticalMachines, Action
+from src.envs.scheduling.scheduling_envs.simulator_identical_machines import IdenticalMachines, Action
 
 
 def tst_identical_machines():
