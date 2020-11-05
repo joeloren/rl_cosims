@@ -68,11 +68,11 @@ def main():
     problem_name = 'cvrp'
     problem_type = 'uniform_offline'
     max_customer_times = 0
-    size = 20
+    size = 10
     vehicle_velocity = 1
     vehicle_capacity = 30
     random_seed = 0
-    max_demand = 10
+    max_demand = 5
     start_at_depot = True
     EVAL_BASELINES_RESULTS_FILENAME = (f"experiments/{problem_name}/{size}s_{vehicle_capacity}c_{max_customer_times}t/"
                                        f"baseline_values.json")
