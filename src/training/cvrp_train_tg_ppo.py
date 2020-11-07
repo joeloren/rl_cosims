@@ -64,7 +64,7 @@ def evaluate_policy_simple_single_seed(problem: Env, policy: Callable[[dict, Env
 
 def main():
     # Init environment
-    use_trains = True
+    use_trains = False
     problem_name = 'cvrp'
     problem_type = 'uniform_offline'
     max_customer_times = 0
@@ -124,34 +124,34 @@ def main():
 
     model_config = {
         'n_passes': 4,
-        'edge_embedding_dim': 128,
-        'node_embedding_dim': 128,
-        'global_embedding_dim': 128,
-        'edge_hidden_dim': 128,
-        'edge_target_dim': 128,
-        'node_target_dim': 128,
-        'node_dim_out': 128,
+        'edge_embedding_dim': 64,
+        'node_embedding_dim': 64,
+        'global_embedding_dim': 64,
+        'edge_hidden_dim': 64,
+        'edge_target_dim': 64,
+        'node_target_dim': 64,
+        'node_dim_out': 64,
         'edge_dim_out': 1,
-        'node_hidden_dim': 128,
-        'global_hidden_dim': 128,
-        'global_target_dim': 128,
-        'global_dim_out': 128,
+        'node_hidden_dim': 64,
+        'global_hidden_dim': 64,
+        'global_target_dim': 64,
+        'global_dim_out': 64,
         'edge_feature_dim': 1,
         'node_feature_dim': 4,  # indicator, x, y, demand/capacity
         'global_feature_dim': 1,
-        'value_embedding_dim': 128,
+        'value_embedding_dim': 64,
         'use_value_critic': True,
         'use_batch_norm': False
     }
 
     agent_config = {
-        'lr': 3e-4,
+        'lr': 0.001,
         'discount': 0.99,
         # number of episodes to do altogether
         'number_of_episodes': 50000,
         # a batch is N episodes where N is number_of_episodes_in_batch
-        'number_of_episodes_in_batch': 10,  # this must be a division of number of episodes
-        'total_num_eval_seeds': 10,
+        'number_of_episodes_in_batch': 100,  # this must be a division of number of episodes
+        'total_num_eval_seeds': 2,
         'num_eval_seeds': 2,
         'evaluate_every': 50,
         'num_train_seeds': 2,
@@ -160,9 +160,9 @@ def main():
         'value_coeff': 0.3,
         'model_config': model_config,
         'save_checkpoint_every': 1000,
-        'eps_clip': 0.2,
+        'eps_clip': 0.1,
         'n_ppo_updates': 20,
-        'target_kl': 0.005,
+        'target_kl': 0.05,
         'logit_normalizer': 10,
         'problem_name': problem_name  # used for saving results
     }
