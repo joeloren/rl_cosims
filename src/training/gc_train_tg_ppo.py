@@ -18,7 +18,7 @@ from src.envs.graph_coloring.gc_experimentation.problems import (create_fixed_st
                                                                  create_er_random_graph_problem)
 # import RL algorithm -
 from src.agents.tg_ppo_agent import PPOAgent
-from src.models.tg_models import PolicyGNN as PolicyModel
+from src.models.tg_edge_action_models import PolicyGNN as PolicyModel
 
 
 def evaluate_policy_simple(problem: Simulator,

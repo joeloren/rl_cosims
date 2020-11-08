@@ -17,7 +17,7 @@ from src.envs.cvrp.cvrp_wrappers.cvrp_torch_geometric_wrapper import GeometricFu
 from src.envs.cvrp.cvrp_experimentation.problems import (create_uniform_dynamic_problem, create_fixed_static_problem)
 # import RL algorithm -
 from src.agents.tg_ppo_agent import PPOAgent
-from src.models.tg_models import PolicyGNN as PolicyModel
+from src.models.tg_edge_action_models import PolicyGNN as PolicyModel
 
 
 def evaluate_policy_simple(problem: Env,

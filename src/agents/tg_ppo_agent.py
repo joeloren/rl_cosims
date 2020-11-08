@@ -17,7 +17,7 @@ from torch.utils.tensorboard import SummaryWriter
 from torch_geometric import data as tg_data, utils as tg_utils
 from typing import Dict, List, Tuple, Optional
 
-from src.models.tg_models import PolicyGNN
+from src.models.tg_edge_action_models import PolicyGNN
 from src.training.torch_utils import get_available_device
 
 
@@ -149,6 +149,8 @@ class PPOAgent:
         return action.item(), logprob.item(), value.item()
 
     def store_step(self, state, reward, action, log_prob, val):
+        # save action as action_index (this is used if action is in the nodes)
+        state.action_chosen_index = action
         self.batch_states.append(state)
         if reward is not None:
             self.episode_rewards.append(self.reward)

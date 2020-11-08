@@ -309,8 +309,6 @@ class PolicyGNN(torch.nn.Module):
         action_distribution = Categorical(action_probabilities)
         if ((action_probabilities < 0).any()) or (torch.isnan(action_probabilities).any()):
             print(f'action probs: {action_probabilities}, action values: {action_values}')
-            print('Saving a checkpoint before crashing...')
-            self.save_checkpoint('crash_checkpoint.pth.tar')
         action = action_distribution.sample()  # trying to sample for both train and test
         action_value = action_values[action]
         # gradients should be in log_prob, actions are without gradients

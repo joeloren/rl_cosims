@@ -6,7 +6,7 @@ import time
 import torch
 # our imports
 from src.agents.tg_ppo_agent import PPOAgent
-from src.models.tg_models import PolicyGNN
+from src.models.tg_edge_action_models import PolicyGNN
 from src.envs.graph_coloring.gc_simulation.simulator import Simulator
 from src.envs.graph_coloring.gc_wrappers.gc_torch_geometric_wrappers import GraphWithColorsWrapper
 
