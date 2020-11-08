@@ -10,6 +10,7 @@ from torch.nn import Sequential as Seq, Linear as Lin, LeakyReLU, ReLU
 from torch_geometric import data as tg_data, utils as tg_utils
 from torch_geometric.nn import GATConv
 from torch_geometric.nn.norm import BatchNorm
+from torch_scatter import scatter_mean
 
 
 class PolicyFullyConnectedGAT(torch.nn.Module):
@@ -100,6 +101,7 @@ class PolicyFullyConnectedGAT(torch.nn.Module):
         """
         x_in = state.x
         edge_index = state.edge_index
+        vehicle_current_customer_index = state.vehicle_current_customer_index
         if isinstance(state, tg.data.Batch):
             batch_size = state.num_graphs
         else:
@@ -115,7 +117,7 @@ class PolicyFullyConnectedGAT(torch.nn.Module):
             x_out = self.batch_norm3(self.ff_encoder3(self.encoder3(x_encoder_2, edge_index) +
                                                       x_encoder_2) + x_encoder_2)
         # run model decoder and find next action
-        x_out_mean = tg_utils.mean_iou(x_out, )
+        x_out_mean = scatter_mean(x_out, state.batch)
 
         output_network = self.decoder(x_out, edge_index)
         if self.use_value_critic:

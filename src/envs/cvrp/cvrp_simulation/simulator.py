@@ -23,6 +23,8 @@ class State:
     customer_ids: np.ndarray  # [N]  this is used in order to go from action chosen to customer chosen
     customer_visited: np.ndarray  # [N] bool this vector is used to know if customer has been  visited or not
     # (True=vehicle visited the customer)
+    current_vehicle_customer: int  # the current customer index the vehicle is at (if it's at the depot we assume is the
+    # length of the customers.
 
 
 class CVRPSimulation(Env):
@@ -58,6 +60,8 @@ class CVRPSimulation(Env):
         # - depot_position: np.array  # x,y
         # - current_vehicle_position: np.array  # x,y
         # - current_vehicle_capacity: int
+        # - current_vehicle_customer: int,  the index of the vehicle customer chosen (if vehicle is at the depot this
+        # will be the number of customers)
         obs_spaces = {
             "customer_positions": spaces.Box(low=0, high=1, shape=(self.max_customers, 2), dtype=np.float32),
             "customer_demands": spaces.Box(low=1, high=10, shape=(self.max_customers,), dtype=np.int32),
@@ -67,6 +71,7 @@ class CVRPSimulation(Env):
             "current_vehicle_position": spaces.Box(low=0, high=1, shape=(2,), dtype=np.float32),
             "current_vehicle_capacity": spaces.Box(low=0, high=self.problem_generator.vehicle_capacity, shape=(1,),
                                                    dtype=np.float32),
+            "current_vehicle_customer": spaces.Box(low=0, high=max_customers + 1, shape=(1,), dtype=np.int32),
             "max_vehicle_capacity": spaces.Box(low=0, high=self.problem_generator.vehicle_capacity, shape=(1,),
                                                dtype=np.float32),
         }
@@ -112,6 +117,8 @@ class CVRPSimulation(Env):
             traveled_distance = np.linalg.norm(depot_position - self.current_state.current_vehicle_position)
             self.current_state.current_vehicle_position = deepcopy(depot_position)
             self.current_state.current_vehicle_capacity = self.initial_state.current_vehicle_capacity
+            # vehicle moves to depot so the customer chosen index will be last_customer_id + 1
+            self.current_state.current_vehicle_customer = np.max(self.current_state.customer_ids) + 1
         # customer is chosen
         else:
             # going to a customer
@@ -132,6 +139,7 @@ class CVRPSimulation(Env):
             self.current_state.customer_visited[customer_index] = True
             self.current_state.current_vehicle_position = customer_position
             self.current_state.current_vehicle_capacity -= customer_demand
+            self.current_state.current_vehicle_customer = customer_index
         # find if the simulation is over
         is_done = self.calculate_is_complete()
         # if simulation is done, add returning to depot to reward
@@ -181,6 +189,7 @@ class CVRPSimulation(Env):
             "current_vehicle_position": current_vehicle_position,
             "current_vehicle_capacity": current_vehicle_capacity,
             "max_vehicle_capacity": max_vehicle_capacity,
+            "current_vehicle_customer": self.current_state.current_vehicle_customer
         }
 
     @staticmethod

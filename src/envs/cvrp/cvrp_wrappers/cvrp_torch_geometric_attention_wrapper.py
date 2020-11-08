@@ -94,9 +94,12 @@ class GeometricAttentionWrapper(Wrapper):
             illegal_actions[0] = True
         # mask out all customers that there demand exceeds the vehicle current capacity
         illegal_actions[1:] = customer_demands > vehicle_capacity
+        vehicle_current_customer_index = torch.tensor(obs["current_vehicle_customer"],device=node_features_tensor.device,
+                                                dtype=torch.int32)
         graph_tg = tg.data.Data(x=node_features_tensor, edge_attr=edge_attributes_tensor,
                                 edge_index=edge_indexes_tensor)
         graph_tg.illegal_actions = illegal_actions
+        graph_tg.vehicle_current_customer_index = vehicle_current_customer_index
         graph_tg.u = torch.tensor([[1]], device=node_features_tensor.device, dtype=torch.float32)
         self.num_customers = num_customers
         return graph_tg
