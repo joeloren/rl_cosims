@@ -30,12 +30,11 @@ class PolicyFullyConnectedGAT(torch.nn.Module):
         self.use_value_critic = cfg['use_value_critic']
         self.dropout = 0
         self.decode_type = None
-        self.num_layers = 3
+        self.num_layers = 1
         self.logit_normalizer = cfg['logit_normalizer']
 
-        self.embedding = Seq(Lin(self.cfg['num_features'], self.cfg['embedding_dim'] * 5),
-                             LeakyReLU(),
-                             Lin(self.cfg['embedding_dim'] * 5, self.cfg['embedding_dim']))
+        self.embedding = Seq(Lin(self.cfg['num_features'], self.cfg['embedding_dim']),
+                             LeakyReLU())
         # encoder is the following equation for each node:
         #   g_i = BN(h_i + MHA(h_0, h_1, ... h_n))
         #   h_i = BN(g_i + FF(g_i))
@@ -44,31 +43,28 @@ class PolicyFullyConnectedGAT(torch.nn.Module):
         # H = 1/n * sum(h_i)  (for i = 0, 1, ... n)
         self.encoder1 = GATConv(self.cfg['embedding_dim'], self.cfg['embedding_dim'], heads=8,
                                 dropout=self.dropout, bias=True, concat=False)
-        self.ff_encoder1 = Seq(Lin(self.cfg['embedding_dim'], self.cfg['embedding_dim'] * 5),
-                               LeakyReLU(),
-                               Lin(self.cfg['embedding_dim'] * 5, self.cfg['embedding_dim']))
+        self.ff_encoder1 = Seq(Lin(self.cfg['embedding_dim'], self.cfg['embedding_dim']),
+                               LeakyReLU())
         self.batch_norm1 = BatchNorm(self.cfg['embedding_dim'])
 
         self.encoder2 = GATConv(self.cfg['embedding_dim'], self.cfg['embedding_dim'], heads=8,
                                 dropout=self.dropout, bias=True, concat=False)
-        self.ff_encoder2 = Seq(Lin(self.cfg['embedding_dim'], self.cfg['embedding_dim'] * 5),
-                               ReLU(),
-                               Lin(self.cfg['embedding_dim'] * 5, self.cfg['embedding_dim']))
+        self.ff_encoder2 = Seq(Lin(self.cfg['embedding_dim'], self.cfg['embedding_dim']),
+                               ReLU())
         self.batch_norm2 = BatchNorm(self.cfg['embedding_dim'])
 
         self.encoder3 = GATConv(self.cfg['embedding_dim'], self.cfg['embedding_dim'], heads=8,
                                 dropout=self.dropout, bias=True, concat=False)
-        self.ff_encoder3 = Seq(Lin(self.cfg['embedding_dim'], self.cfg['embedding_dim'] * 5),
-                               ReLU(),
-                               Lin(self.cfg['embedding_dim'] * 5, self.cfg['embedding_dim']))
+        self.ff_encoder3 = Seq(Lin(self.cfg['embedding_dim'], self.cfg['embedding_dim']),
+                               ReLU())
         self.batch_norm3 = BatchNorm(self.cfg['embedding_dim'])
         # the decoder is done once on the following vector
         # concat([H, h_prev_node, vehicle_capacity])
         self.decoder = GATConv(self.cfg['embedding_dim'], 1, heads=1, dropout=self.dropout, bias=True)
         if self.use_value_critic:
-            self.value_model = Seq(Lin(cfg['embedding_dim'], cfg['value_embedding_dim'] * 3),
+            self.value_model = Seq(Lin(cfg['embedding_dim'], cfg['value_embedding_dim'] * 2),
                                    ReLU(),
-                                   Lin(cfg['value_embedding_dim'] * 3, 1))
+                                   Lin(cfg['value_embedding_dim'] * 2, 1))
 
         self.init_parameters()
 

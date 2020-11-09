@@ -26,10 +26,13 @@ class GeometricAttentionWrapper(Wrapper):
         """
         # reset env -
         obs = self.env.reset()
-        self.num_customers = 0
+        self.num_customers = obs['customer_positions'].shape[0]
         # create tg observation from obs dictionary -
         tg_obs = self.observation(obs)
         return tg_obs
+
+    def seed(self, seed=None):
+        self.env.seed(seed)
 
     def step(self, reinforce_action):
         """
@@ -66,8 +69,8 @@ class GeometricAttentionWrapper(Wrapper):
         """
         customer_positions = obs['customer_positions']
         vehicle_position = obs["current_vehicle_position"]
-        customer_demands = obs['customer_demands']
-        vehicle_capacity = obs['current_vehicle_capacity']
+        customer_demands = obs['customer_demands'] / obs['max_vehicle_capacity']
+        vehicle_capacity = obs['current_vehicle_capacity'] / obs['max_vehicle_capacity']
         num_customers = customer_positions.shape[0]
         num_depots = 1
         num_vehicles = 1
