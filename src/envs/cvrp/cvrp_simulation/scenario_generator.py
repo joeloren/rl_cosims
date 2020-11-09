@@ -173,7 +173,8 @@ class SampleDynamicBenchmark(ScenarioGenerator):
             customer_demands=self.customer_demands_rv.rvs(self.vrp_size),  # [N]
             customer_times=customer_times,  # [N] this is the start time of each customer
             customer_ids=np.arange(0, self.vrp_size).astype(np.int),
-            customer_visited=np.zeros(self.vrp_size).astype(np.bool)
+            customer_visited=np.zeros(self.vrp_size).astype(np.bool),
+            current_vehicle_customer=self.vrp_size
             # all customers start as not visited
         )
         return state

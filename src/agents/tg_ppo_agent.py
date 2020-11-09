@@ -150,7 +150,7 @@ class PPOAgent:
 
     def store_step(self, state, reward, action, log_prob, val):
         # save action as action_index (this is used if action is in the nodes)
-        state.action_chosen_index = action
+        state.action_chosen_index = torch.tensor([action], device=state.x.device, dtype=torch.long)
         self.batch_states.append(state)
         if reward is not None:
             self.episode_rewards.append(self.reward)
