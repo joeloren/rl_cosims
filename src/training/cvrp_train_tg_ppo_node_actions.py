@@ -131,12 +131,12 @@ def main():
     }
 
     agent_config = {
-        'lr': 3e-3,
+        'lr': 3e-2,
         'discount': 0.99,
         # number of episodes to do altogether
         'number_of_episodes': 50000,
         # a batch is N episodes where N is number_of_episodes_in_batch
-        'number_of_episodes_in_batch': 40,  # this must be a division of number of episodes
+        'number_of_episodes_in_batch': 20,  # this must be a division of number of episodes
         'total_num_eval_seeds': 2,
         'num_eval_seeds': 2,
         'evaluate_every': 50,
@@ -146,8 +146,8 @@ def main():
         'value_coeff': 0.3,
         'model_config': model_config,
         'save_checkpoint_every': 1000,
-        'eps_clip': 0.2,
-        'n_ppo_updates': 10,
+        'eps_clip': 0.5,
+        'n_ppo_updates': 20,
         'target_kl': 0.005,
         'logit_normalizer': 10,
         'problem_name': problem_name  # used for saving results
