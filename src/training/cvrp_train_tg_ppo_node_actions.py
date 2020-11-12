@@ -17,7 +17,7 @@ from src.envs.cvrp.cvrp_wrappers.cvrp_torch_geometric_attention_wrapper import G
 from src.envs.cvrp.cvrp_experimentation.problems import (create_uniform_dynamic_problem, create_fixed_static_problem)
 # import RL algorithm -
 from src.agents.tg_ppo_agent import PPOAgent
-from src.models.tg_node_action_models import PolicyFullyConnectedGAT
+from src.models.tg_node_action_models import PolicyFullyConnectedMessagePassing
 
 
 def evaluate_policy_simple(problem: Env,
@@ -70,7 +70,7 @@ def main():
     max_customer_times = 0
     size = 10
     vehicle_velocity = 1
-    vehicle_capacity = 30
+    vehicle_capacity = 100
     random_seed = 0
     max_demand = 10
     start_at_depot = True
@@ -122,21 +122,42 @@ def main():
     tg_env = GeometricAttentionWrapper(env)
     tg_env.reset()
 
+    # model_config = {
+    #     'use_value_critic': True,
+    #     'num_features': 4,
+    #     'embedding_dim': 128,
+    #     'value_embedding_dim': 128,
+    #     'use_batch_norm': False
+    # }
     model_config = {
+        'n_passes': 4,
+        'edge_embedding_dim': 64,
+        'node_embedding_dim': 64,
+        'global_embedding_dim': 64,
+        'edge_hidden_dim': 64,
+        'edge_target_dim': 64,
+        'node_target_dim': 64,
+        'node_dim_out': 1,
+        'edge_dim_out': 1,
+        'node_hidden_dim': 64,
+        'global_hidden_dim': 64,
+        'global_target_dim': 64,
+        'global_dim_out': 64,
+        'edge_feature_dim': 1,
+        'node_feature_dim': 4,  # indicator, x, y, demand/capacity
+        'global_feature_dim': 1,
+        'value_embedding_dim': 64,
         'use_value_critic': True,
-        'num_features': 4,
-        'embedding_dim': 128,
-        'value_embedding_dim': 128,
         'use_batch_norm': False
     }
 
     agent_config = {
-        'lr': 3e-3,
-        'discount': 0.99,
+        'lr': 0.0001,
+        'discount': 0.90,
         # number of episodes to do altogether
         'number_of_episodes': 50000,
         # a batch is N episodes where N is number_of_episodes_in_batch
-        'number_of_episodes_in_batch': 40,  # this must be a division of number of episodes
+        'number_of_episodes_in_batch': 60,  # this must be a division of number of episodes
         'total_num_eval_seeds': 2,
         'num_eval_seeds': 2,
         'evaluate_every': 50,
@@ -147,9 +168,9 @@ def main():
         'model_config': model_config,
         'save_checkpoint_every': 1000,
         'eps_clip': 0.2,
-        'n_ppo_updates': 10,
+        'n_ppo_updates': 40,
         'target_kl': 0.005,
-        'logit_normalizer': 10,
+        'logit_normalizer': 5,
         'problem_name': problem_name  # used for saving results
     }
     model_config['logit_normalizer'] = agent_config['logit_normalizer']
@@ -176,7 +197,8 @@ def main():
                            } for baseline, baseline_dict in baseline_values.items()
             }
 
-    model = PolicyFullyConnectedGAT(cfg=model_config, model_name='ppo_policy_model')
+    # model = PolicyFullyConnectedGAT(cfg=model_config, model_name='ppo_policy_model')
+    model = PolicyFullyConnectedMessagePassing(cfg=model_config, model_name='ppo_message_passing_model')
     set_seeds()
     if use_trains:
         parameters_agent = task.connect(agent_config, name='agent_config')
