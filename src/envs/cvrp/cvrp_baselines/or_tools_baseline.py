@@ -19,7 +19,7 @@ def create_data_model(obs, env, precision=1000):
     _locations = [
         obs["depot_position"] * precision,  # depot
     ]
-    num_customers = env.get_opened_customers().size
+    num_customers = env.get_opened_and_not_visited_customers().size
     _locations.extend(
         [obs["customer_positions"][i, :] * precision for i in range(num_customers)]
     )  # locations to visit

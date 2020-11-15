@@ -12,7 +12,7 @@ from trains import Task
 from src.envs.cvrp.cvrp_baselines.simple_baseline import distance_proportional_policy
 from src.envs.cvrp.cvrp_baselines.or_tools_baseline import ORToolsPolicy
 # import cvrp simulation -
-from src.envs.cvrp.cvrp_wrappers.cvrp_torch_geometric_attention_wrapper import GeometricAttentionWrapper
+from src.envs.cvrp.cvrp_wrappers.cvrp_all_customers_torch_geometric_attention_wrapper import GeometricAttentionWrapper
 # import problem creator
 from src.envs.cvrp.cvrp_experimentation.problems import (create_uniform_dynamic_problem, create_fixed_static_problem)
 # import RL algorithm -
@@ -68,7 +68,7 @@ def main():
     problem_name = 'cvrp'
     problem_type = 'uniform_offline'
     max_customer_times = 0
-    size = 10
+    size = 5
     vehicle_velocity = 1
     vehicle_capacity = 100
     random_seed = 0
@@ -112,8 +112,8 @@ def main():
     # env_config = {'problem_type': 'fixed_problem',
     #               'size': 3,
     #               'vehicle_capacity': 10,
-    #               'vehicle_position': [0,0],
-    #               'customer_positions':customer_positions,
+    #               'vehicle_position': [0, 0],
+    #               'customer_positions': customer_positions,
     #               'start_at_depot': True
     #               }
     # EVAL_BASELINES_RESULTS_FILENAME = (f'experiments/{3}s_{10}c_{0}t/'
@@ -144,7 +144,7 @@ def main():
         'global_target_dim': 64,
         'global_dim_out': 64,
         'edge_feature_dim': 1,
-        'node_feature_dim': 4,  # indicator, x, y, demand/capacity
+        'node_feature_dim': 5,  # indicator, x, y, demand/capacity, is_visited
         'global_feature_dim': 1,
         'value_embedding_dim': 64,
         'use_value_critic': True,

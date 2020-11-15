@@ -14,6 +14,7 @@ class GeometricAttentionWrapper(Wrapper):
     we mask out the actions that are not currently feasible (where demand exceeds the current capacity or if the vehicle
     is currently at the depot)
     """
+
     def __init__(self, env):
         super().__init__(env)
         self.num_nodes = 0
@@ -61,13 +62,14 @@ class GeometricAttentionWrapper(Wrapper):
         """
         this function takes the observation and creates a graph including the following
         features:
-        (indicator, x, y, node_demand)
+        (indicator, x, y, node_demand, node_visited)
         indicator: 0: depot, 1: customers
         x, y: position of the node in grid (double, double)
         node_demand: the customer demand or current vehicle capacity depending on the type of node (the vehicle
         capacity is negative)
         """
         customer_positions = obs['customer_positions']
+        customer_visited = obs['customer_visited']
         vehicle_position = obs["current_vehicle_position"]
         customer_demands = obs['customer_demands'] / obs['max_vehicle_capacity']
         vehicle_capacity = obs['current_vehicle_capacity'] / obs['max_vehicle_capacity']
@@ -78,18 +80,29 @@ class GeometricAttentionWrapper(Wrapper):
         node_pos = np.vstack([customer_positions,
                               obs['depot_position'],
                               vehicle_position])
+        # if vehicle is currently at the depot position than depot is treated like a visited node
+        if np.array_equal(vehicle_position, obs['depot_position']):
+            depot_visited = np.zeros(shape=(num_depots, 1))
+        else:
+            depot_visited = np.ones(shape=(num_depots, 1))
+        # node visited is True if the node can be chosen as action (customer that is not yet visited or depot if the
+        # vehicle is not currently at the depot). Otherwise the node visited value is False (this is always true for
+        # vehicle node)
+        node_visited = np.vstack([np.logical_not(customer_visited).reshape(-1, 1),
+                                  depot_visited,
+                                  np.zeros(shape=(num_vehicles, 1))])
         # indicator is : 0: customers, 1: depot, 2: vehicle
         node_ind = np.vstack([np.ones(shape=(num_customers, 1)) * 0,
                               np.ones(shape=(num_depots, 1)) * 1,
                               np.ones(shape=(num_vehicles, 1)) * 2])
         node_demand = np.vstack([customer_demands.reshape(-1, 1),
-                                np.zeros(shape=(num_depots, 1)),
+                                 np.zeros(shape=(num_depots, 1)),
                                  -vehicle_capacity])
         customer_nodes = np.where(node_ind == 0)[0]
         depot_nodes = np.where(node_ind == 1)[0]
         vehicle_nodes = np.where(node_ind == 2)[0]
         # features are : pos_x, pos_y, demand/capacity
-        node_features = np.hstack([node_ind, node_pos, node_demand])
+        node_features = np.hstack([node_ind, node_pos, node_demand, node_visited])
         # customer edge indexes include all customers and depot
         # edge_indexes = [(i, j) for i, j in itertools.product(range(num_customers + 1), range(num_customers + 1)) if
         #                 i != j]
@@ -102,12 +115,13 @@ class GeometricAttentionWrapper(Wrapper):
                                            device=node_features_tensor.device).transpose(1, 0)
         edge_attributes_tensor = torch.ones(size=(len(edge_indexes_directed), 1), device=node_features_tensor.device,
                                             dtype=torch.float32)
-        illegal_actions = np.zeros(shape=(num_nodes, ))
+        illegal_actions = np.zeros(shape=(num_nodes,))
         if not obs['action_mask'][self.env.DEPOT_INDEX]:
             # depot option is not available, and therefore this action should be masked
             illegal_actions[depot_nodes] = True
         # mask out all customers that there demand exceeds the vehicle current capacity
-        illegal_actions[customer_nodes] = (customer_demands > vehicle_capacity)
+        illegal_actions[customer_nodes] = np.logical_or(customer_demands > vehicle_capacity,
+                                                        customer_visited)
         # mask out the vehicle nodes since they can never be chosen
         illegal_actions[vehicle_nodes] = True
         illegal_actions_tensor = torch.tensor(illegal_actions, device=node_features_tensor.device,
@@ -118,4 +132,3 @@ class GeometricAttentionWrapper(Wrapper):
         graph_tg.u = torch.tensor([[1]], device=node_features_tensor.device, dtype=torch.float32)
         self.num_customers = num_customers
         return graph_tg
-

@@ -1,7 +1,7 @@
 import numpy as np
 from src.envs.cvrp.cvrp_distributions.mixture_distribution import MixtureModel, TruncatedGaussian2D
 from src.envs.cvrp.cvrp_simulation.scenario_generator import FixedSample, SampleDynamicBenchmark
-from src.envs.cvrp.cvrp_simulation.simulator import CVRPSimulation
+from src.envs.cvrp.cvrp_simulation.simulator_all_customers_in_obs import CVRPSimulation
 from scipy import stats
 
 

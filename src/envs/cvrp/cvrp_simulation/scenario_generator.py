@@ -328,6 +328,7 @@ class FixedSample(ScenarioGenerator):
             customer_times=self.customer_times,
             customer_ids=np.arange(0, self.vrp_size).astype(np.int),
             customer_visited=np.zeros(self.vrp_size).astype(np.bool),
+            current_vehicle_customer=self.vrp_size
         )
         return state
 

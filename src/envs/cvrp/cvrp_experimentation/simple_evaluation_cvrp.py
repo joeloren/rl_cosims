@@ -5,10 +5,10 @@ from typing import Callable, Dict
 from trains import Task
 from matplotlib import pyplot as plt
 import os
+from pathlib import Path
 import warnings
 
 import numpy as np
-from gym import Env
 from tqdm import tqdm
 
 from src.envs.cvrp.cvrp_simulation.simulator import CVRPSimulation
@@ -24,16 +24,15 @@ from src.envs.cvrp.cvrp_experimentation.problems import (
     create_mixture_guassian_dynamic_problem,
 )
 from src.envs.cvrp.cvrp_baselines.sweep_baseline import SweepPolicy
+from src.envs.cvrp.cvrp_policies.ppo_policy import PPOPolicy
 
 
-def evaluate_policy_simple(
-        problems: Dict[int, Env],
-        policy: Callable[[dict, Env], np.ndarray],
-        samples_per_seed=100,
-        logger=None,
-        save_routes=False,
-        policy_name=None,
-):
+def evaluate_policy_simple(problems: Dict[int, CVRPSimulation],
+                           policy: Callable[[dict, CVRPSimulation], np.ndarray],
+                           samples_per_seed=100,
+                           logger=None,
+                           save_routes=False,
+                           policy_name=None):
     """For num_seeds times, determine the mean policy reward by running it samples_per_seed times.
     :param problems of type cvrp simulations
     :param logger is the trains logger
@@ -66,28 +65,24 @@ def evaluate_policy_simple(
                 veh_route=vehicle_route,
             )
             ax.set_title(f"route for policy:{policy_name}, reward:{-mean_reward:.1f}")
-            plt.pause(0.1)
-            plt.close()
+            plt.show()
+            # plt.pause(0.1)
+            # plt.close()
 
         i += 1
     return all_rewards
 
 
-def evaluate_policy_simple_single_seed(
-        problem: CVRPSimulation,
-        policy: Callable[[dict, Env], np.ndarray],
-        seed: int,
-        samples_per_seed: int,
-        save_routes: bool = False,
-):
+def evaluate_policy_simple_single_seed(problem: CVRPSimulation,
+                                       policy: Callable[[dict, CVRPSimulation], np.ndarray],
+                                       seed: int, samples_per_seed: int,
+                                       save_routes: bool = False):
     total_rewards = []
     all_actions = []
     for j in range(samples_per_seed):
         problem.seed(seed)
         obs = problem.reset()
-        if not save_routes:
-            vehicle_route = {}
-        else:
+        if save_routes:
             if j == 0:
                 vehicle_route = {
                     0: {
@@ -97,13 +92,14 @@ def evaluate_policy_simple_single_seed(
                     }
                 }
                 route_num = 0
+        else:
+            vehicle_route = {}
         total_reward = 0.0
         try:
             # reset policy if the method is available
             reset_method = getattr(policy, "reset", None)
             if callable(reset_method):
                 reset_method(obs)
-
             completed = False
             while not completed:
                 if obs["customer_positions"].size > 0:
@@ -136,9 +132,8 @@ def evaluate_policy_simple_single_seed(
                             "total_demand": 0,
                         }
                     else:
-                        vehicle_route[route_num][
-                            "total_demand"
-                        ] += problem.current_state.customer_demands[customer_chosen]
+                        current_customer_demand = problem.current_state.customer_demands[customer_chosen]
+                        vehicle_route[route_num]["total_demand"] += current_customer_demand
                 total_reward += reward
             total_rewards.append(total_reward)
         except Exception:
@@ -147,99 +142,19 @@ def evaluate_policy_simple_single_seed(
     return np.mean(total_rewards), vehicle_route, all_actions
 
 
-def run_simple_test():
-    # check cvrp simulation and state -
-    sim = create_fixed_static_problem()
-    obs = sim.reset()
-    # in this case each time we choose action 0 since the available actions change each time
-    # the number of available customers changes
-    obs, reward, done, _ = sim.step(0)
-    print(f"reward {reward}, done {done}")
-    opened_customers = sim.get_opened_customers()
-    print(f"available customers:{opened_customers}")
-    obs, reward, done, _ = sim.step(0)
-    print(f"reward {reward}, done {done}")
-    opened_customers = sim.get_opened_customers()
-    print(f"available customers:{opened_customers}")
-    obs, reward, done, _ = sim.step(0)
-    print(f"reward {reward}, done {done}")
-    opened_customers = sim.get_opened_customers()
-    print(f"available customers:{opened_customers}")
-
-
-def run_static_benchmark(policy=random_policy):
-    sim = create_uniform_dynamic_problem(
-        max_customer_times=0,
-        size=20,
-        vehicle_velocity=10,
-        vehicle_capacity=200,
-        max_demand=10,
-        random_seed=50,
-        start_at_depot=True,
-    )
-    num_runs = 10
-    seed = 50
-    rand_reward = np.zeros(num_runs)
-
-    sim.seed(seed)
-    for i in range(num_runs):
-        obs = sim.reset()
-        # in this case each time we choose action 0 since the available actions change each time
-        # the number of available customers changes
-        tot_reward = 0
-        done = False
-        while not done:
-            action_probs = policy(obs, sim)
-            action_chosen = np.random.choice(len(obs["action_mask"]), p=action_probs)
-            obs, reward, done, _ = sim.step(action_chosen)
-            tot_reward += reward
-        print(f"finished random run # {i}, total reward {tot_reward}")
-        rand_reward[i] = tot_reward
-    print(f"mean random reward is:{np.mean(rand_reward)}")
-
-
-def run_dynamic_benchmark(policy=random_policy):
-    # check dynamic benchmark generator
-    vrp_size = 20
-    sim = create_uniform_dynamic_problem(
-        max_customer_times=5,
-        size=vrp_size,
-        vehicle_velocity=10,
-        vehicle_capacity=20,
-        max_demand=10,
-        random_seed=50,
-        start_at_depot=True,
-    )
-    num_runs = 10
-    seed = 50
-    rand_reward = np.zeros(num_runs)
-    sim.seed(seed)
-    for i in range(num_runs):
-        obs = sim.reset()
-        # in this case each time we choose action 0 since the available actions change each time
-        # the number of available customers changes
-        tot_reward = 0
-        done = False
-        while not done:
-            action_probs = policy(obs, sim)
-            action_chosen = np.random.choice(len(obs["action_mask"]), p=action_probs)
-            obs, reward, done, _ = sim.step(action_chosen)
-            tot_reward += reward
-        print(f"finished random run # {i}, total reward {tot_reward}")
-        rand_reward[i] = tot_reward
-    print(f"mean random reward is:{np.mean(rand_reward)}")
-
-
 def main():
     warnings.filterwarnings("ignore")
-    POLICIES = ["simple"]
+    POLICIES = ["simple", "ppo"]
     PROBLEMS = ["dynamic_uniform", "static_fixed", "dynamic_mixture_gaussian"]
     parser = argparse.ArgumentParser()
     parser.add_argument("--problem_path", type=str,
-                        default="cvrp_experimentation/saved_problems/dynamic/uniform_20/dynamic_uniform_20-customers.json")
+                        default="cvrp_experimentation/saved_problems/dynamic/uniform_20/"
+                                "dynamic_uniform_20-customers.json")
     parser.add_argument("--policies", type=str, default=["simple"], nargs="+", choices=POLICIES,
                         help="Policies to be tested")
     parser.add_argument("--problem", type=str, default="dynamic_uniform", choices=PROBLEMS, )
+    parser.add_argument("--ppo_model_folder", type=str, help="folder where ppo model is saved",
+                        default="cvrp_experimentation/saved_problems/static/uniform_5/")
     parser.add_argument("--start_seed", type=int, default=0)
     parser.add_argument("--num_seeds", type=int, default=20)
     parser.add_argument("--output_file", type=str,
@@ -263,23 +178,18 @@ def main():
         problem_params = json.load(f)
         if args.use_trains:
             parameters = task.connect(problem_params)
+    envs = None
     if args.problem == "dynamic_uniform":
-        ""
-        envs = {
-            args.start_seed + seed: create_uniform_dynamic_problem(**problem_params, random_seed=args.start_seed + seed)
-            for seed in range(args.num_seeds)
-            }
+        envs = {args.start_seed + seed: create_uniform_dynamic_problem(**problem_params,
+                                                                       random_seed=args.start_seed + seed)
+                for seed in range(args.num_seeds)}
     elif args.problem == "dynamic_mixture_gaussian":
-        envs = {
-                args.start_seed + seed: create_mixture_guassian_dynamic_problem(**problem_params,
+        envs = {args.start_seed + seed: create_mixture_guassian_dynamic_problem(**problem_params,
                                                                                 random_seed=args.start_seed + seed)
-                for seed in range(args.num_seeds)
-                }
+                for seed in range(args.num_seeds)}
     elif args.problem == "static_fixed":
-        envs = {
-            args.start_seed + seed: create_fixed_static_problem(**problem_params)
-            for seed in range(args.num_seeds)
-        }
+        envs = {args.start_seed + seed: create_fixed_static_problem(**problem_params)
+                for seed in range(args.num_seeds)}
 
     print("running evaluation code")
     sweep_policy = SweepPolicy()
@@ -292,13 +202,20 @@ def main():
                                                             save_routes=save_routes)
         values["Inversely Proportional to Distance"] = evaluate_policy_simple(envs, distance_proportional_policy,
                                                                               samples_per_seed=5, logger=logger,
-                                                                              save_routes=save_routes, )
+                                                                              save_routes=save_routes)
         values["Sweep"] = evaluate_policy_simple(envs, sweep_policy, samples_per_seed=5, logger=logger,
-                                                 save_routes=save_routes, )
+                                                 save_routes=save_routes)
         values["OR-Tools"] = evaluate_policy_simple(envs, or_tools, samples_per_seed=5, logger=logger,
                                                     save_routes=save_routes)
 
     expensive_policies = []
+    if "ppo" in policies:
+        with open(Path(args.ppo_model_folder) / "agent_params.json") as f:
+            agent_config_dict = json.load(f)
+        expensive_policies.append(("PPO",
+                                   PPOPolicy(agent_config_dict, agent_config_dict["model_config"],
+                                             args.ppo_model_folder, envs[args.start_seed]), envs))
+
     # Run evaluation of specified policies
     for policy_name, policy, env_list in expensive_policies:
         print("Evaluating: ", policy_name)

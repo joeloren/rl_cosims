@@ -254,6 +254,7 @@ class PPOAgent:
         self.writer.add_scalar('Train/Loss/value', value_loss.item(), self.episode_number)
         self.writer.add_scalar('Train/Loss/policy', policy_loss.mean().item(), self.episode_number)
         self.writer.add_scalar('Train/Loss/entropy', entropy_loss.item(), self.episode_number)
+        self.writer.add_scalar('Train/mean_kl', mean_kl, self.episode_number)
         # self.writer.add_scalar('Train/Loss/total', total_loss, self.episode_number)
         return total_loss, chosen_logprob, mean_kl
 
