@@ -68,7 +68,7 @@ def main():
     problem_name = 'cvrp'
     problem_type = 'uniform_offline'
     max_customer_times = 0
-    size = 5
+    size = 20
     vehicle_velocity = 1
     vehicle_capacity = 100
     random_seed = 0
@@ -157,7 +157,7 @@ def main():
         # number of episodes to do altogether
         'number_of_episodes': 500000,
         # a batch is N episodes where N is number_of_episodes_in_batch
-        'number_of_episodes_in_batch': 150,  # this must be a division of number of episodes
+        'number_of_episodes_in_batch': 50,  # this must be a division of number of episodes
         'total_num_eval_seeds': 100,
         'num_eval_seeds': 10,
         'evaluate_every': 50,
