@@ -70,7 +70,7 @@ def main():
     max_customer_times = 0
     size = 20
     vehicle_velocity = 1
-    vehicle_capacity = 100
+    vehicle_capacity = 30
     random_seed = 0
     max_demand = 10
     start_at_depot = True
@@ -152,10 +152,10 @@ def main():
     }
 
     agent_config = {
-        'lr': 0.0001,
+        'lr': 0.0003,
         'discount': 0.95,
         # number of episodes to do altogether
-        'number_of_episodes': 500000,
+        'number_of_episodes': 50000000,
         # a batch is N episodes where N is number_of_episodes_in_batch
         'number_of_episodes_in_batch': 50,  # this must be a division of number of episodes
         'total_num_eval_seeds': 100,

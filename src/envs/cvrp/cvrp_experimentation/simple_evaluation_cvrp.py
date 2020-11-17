@@ -93,7 +93,7 @@ def evaluate_policy_simple_single_seed(problem: CVRPSimulation,
                 }
                 route_num = 0
         else:
-            vehicle_route = {}
+            vehicle_route = None
         total_reward = 0.0
         try:
             # reset policy if the method is available
