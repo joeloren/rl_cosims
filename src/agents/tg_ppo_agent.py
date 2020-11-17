@@ -31,7 +31,7 @@ class PPOAgent:
             baseline_eval_values: Dict[str, Dict[int, float]],
     ):
         self.config = config
-        self.env = env
+        self.env: gym.Wrapper = env
         self.device = get_available_device()
         print(f'device chosen:{self.device}')
         self.policy: torch.nn.Module = model.to(self.device)
@@ -81,7 +81,7 @@ class PPOAgent:
         # dictionary where the key is the reward and the value is the episode number (used for
         # deleting the worst model saved so far)
         self.best_overall_model_episodes = {}
-        self.batch_states, self.batch_rtgs, self.batch_actions, self.batch_log_probs, self.batch_advantage = [], [], [], [], []
+        self.batch_states, self.batch_rtgs, self.batch_actions, self.batch_log_probs, self.batch_vals, self.batch_advantage = [], [], [], [], [], []
         self.best_episode_score = np.inf
 
     def reset_game(self):
@@ -114,7 +114,7 @@ class PPOAgent:
         self.reset_game()
         loss = 0
         while not self.done:
-            # print(f'calculating episode {self.episode_number},  step:{self.episode_step_number}')
+            # print(f"calculating episode {self.episode_number},  step:{self.episode_step_number}")
             self.episode_step()
             # self.update_next_state_reward_done_and_score()
             # TODO need to update time_to_learn to be based on number of batches
@@ -130,14 +130,11 @@ class PPOAgent:
         """Picks and then conducts actions. Then saves the log probabilities of the actions it
         conducted to be used for
         learning later"""
-        action, log_probability = self.select_action_and_log_prob(state=self.state)
+        action, log_probability, val = self.select_action_and_log_prob(state=self.state)
         # store the state, action, reward and log-prob of this step (before action is preformed)
         self.next_state, self.reward, self.done, info = self.env.step(action)
-        if train:  # and (~self.state.illegal_actions).sum() > 1:
-            self.store_state()
-            self.store_log_probability(log_probability)
-            self.store_action(action)
-            self.store_reward()
+        if train:
+            self.store_step(state=self.state, reward=self.reward, action=action, log_prob=log_probability, val=val)
         if self.done:
             # add return to go (rtg) of this episode to batch rtgs
             self.batch_rtgs.extend(self.compute_episode_rtgs())
@@ -148,49 +145,16 @@ class PPOAgent:
     def select_action_and_log_prob(self, state):
         """Picks actions and then calculates the log probabilities of the actions it picked given
         the policy"""
-        action_probabilities, action_values = self.compute_action_probs(state)
-        # this creates a distribution to sample from
-        action_distribution = Categorical(action_probabilities)
-        if ((action_probabilities < 0).any()) or (torch.isnan(action_probabilities).any()):
-            print(f'action probs: {action_probabilities}, action values: {action_values}')
-            print('Saving a checkpoint before crashing...')
-            self.save_checkpoint('crash_checkpoint.pth.tar')
-        action = action_distribution.sample()  # trying to sample for both train and test
-        # gradients should be in log_prob, actions are without gradients
-        if action.item() in state.illegal_actions.nonzero():
-            print(f'Warning! Picked an illegal action: {action}')
-        return action.item(), action_distribution.log_prob(action)
+        action, logprob, value = self.policy.step(state, self.device)
+        return action.item(), logprob.item(), value.item()
 
-    def compute_action_probs(self, state) -> Tuple[torch.Tensor, torch.Tensor]:
-        # PyTorch only accepts mini-batches and not individual observations so we have to add
-        # a 'fake' dimension to our observation using unsqueeze
-        self.policy.eval()
-        with torch.no_grad():
-            # run policy in eval mode for running as a policy and not training
-            action_values, _ = self.policy.forward(tg_data.Batch.from_data_list([state.clone()]).to(self.device))
-            action_values = action_values.squeeze()
-        self.policy.train()
-        # normalize logit values
-        action_values = torch.tanh(action_values) * self.logit_normalizer
-        # mask out actions that are not possible
-        action_values[state.illegal_actions] = -np.inf
-        action_probabilities = F.softmax(action_values, dim=0)
-        return action_probabilities, action_values
-
-    def store_log_probability(self, log_probabilities):
-        """Stores the log probabilities of picked actions to be used for learning later"""
-        self.batch_log_probs.append(log_probabilities)
-
-    def store_action(self, action):
-        self.batch_actions.append(action)
-
-    def store_state(self):
-        self.batch_states.append(self.state)
-
-    def store_reward(self):
-        """Stores the reward picked"""
-        if self.reward is not None:
+    def store_step(self, state, reward, action, log_prob, val):
+        self.batch_states.append(state)
+        if reward is not None:
             self.episode_rewards.append(self.reward)
+        self.batch_actions.append(action)
+        self.batch_log_probs.append(log_prob)
+        self.batch_vals.append(val)
 
     def compute_episode_rtgs(self):
         """Calculates the cumulative discounted return for the episode"""
@@ -211,13 +175,12 @@ class PPOAgent:
 
     def learn(self):
         """Runs a learning iteration for the policy"""
-        total_num_steps = len(self.batch_rtgs)
         self.old_policy.load_state_dict(self.policy.state_dict())
         start_time = time.time()
+        total_loss = 0
         for i in range(self.n_ppo_updates):
             self.optimizer.zero_grad()
             total_loss, chosen_logprobs_train, mean_kl = self.compute_loss()
-            sliding_average_total_reward = -np.mean(self.total_rewards_window)
             total_loss.backward()
             self.optimizer.step()
             if mean_kl >= 1.5 * self.target_kl:
@@ -259,6 +222,7 @@ class PPOAgent:
         self.batch_states = []
         self.batch_log_probs = []
         self.batch_advantage = []
+        self.batch_vals = []
         self.episode_number_in_batch = 0
 
     def compute_loss(self):
@@ -268,29 +232,9 @@ class PPOAgent:
 
         """
         original_logprobs = torch.tensor(self.batch_log_probs).to(device="cpu").view(-1, 1)
-        # Get action log probabilities
-        state_batch = tg_data.Batch.from_data_list(self.batch_states).to(device="cpu")
-        self.policy.train()
-        edge_rows, edge_cols = state_batch.edge_index
-        edge_batch_indexes = state_batch.batch[edge_rows]
-        batch_scores, batch_state_values = self.policy.forward(state_batch.to(device=self.device).clone())
-        # convert network outputs to cpu -
-        batch_scores = batch_scores.to(device="cpu")
-        batch_state_values = batch_state_values.to(device="cpu")
-        batch_scores = torch.tanh(batch_scores) * self.logit_normalizer
-        # in order to get the softmax on each batch separately the indexes for softmax are
-        # the batch index for each row in edge index
-        batch_scores[state_batch.illegal_actions] = -np.inf
-
-        batch_probabilities = tg_utils.softmax(batch_scores, edge_batch_indexes)
-        batch_graph_size = torch.tensor([torch.sum(edge_batch_indexes == b) for b in range(state_batch.num_graphs)]).to(
-            "cpu")
-        cumulative_batch_actions = torch.tensor(self.batch_actions).to(device="cpu")
-        cumulative_batch_actions[1:] = (torch.cumsum(batch_graph_size, dim=0)[:-1] + cumulative_batch_actions[1:])
-        chosen_probabilities = batch_probabilities.gather(dim=0, index=cumulative_batch_actions.view(-1, 1))
-        # calculate log after choosing from probability for numerical reasons
-        chosen_logprob = torch.log(chosen_probabilities).to(device="cpu").view(-1, 1)
-        # add entropy for exploration
+        # get the chosen logprobs, probs and state values from the policy neural network
+        policy_results = self.policy.compute_probs_and_state_values(self.batch_states, self.batch_actions, self.device)
+        chosen_logprob, batch_probabilities, batch_state_values = policy_results
         # Policy loss
         batch_rtgs_tensor = torch.tensor(self.batch_rtgs, device="cpu", dtype=torch.float32).view(-1, 1)
         batch_advantage_tensor = self.normalize_batch_advantage(batch_rtgs_tensor - batch_state_values.detach())
@@ -347,7 +291,7 @@ class PPOAgent:
         self.writer.add_scalar('Eval/Reward per episode', mean_reward, self.episode_number)
         # save the best overall model -
         if len(self.best_overall_models) >= 1:
-            print( f"current relative:{mean_relative_diff},"
+            print(f"current relative:{mean_relative_diff},"
                    f" max relative:{max(self.best_overall_models, key=lambda x: x[0])[0]}")
         if (len(self.best_overall_models) < 3 or
                 mean_relative_diff < max(self.best_overall_models, key=lambda x: x[0])[0]):
@@ -373,7 +317,7 @@ class PPOAgent:
         self.evaluation_episodes += 1
 
     def save_model(self):
-        # print(f'saving model, episode {self.episode_number}')
+        # print(f"saving model, episode {self.episode_number}")
         dir_name = self.config['model_save_dir']
         file_name = f'model_ep_{self.episode_number}'
         torch.save(self.policy.state_dict(), Path(dir_name) / file_name)

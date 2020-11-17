@@ -12,7 +12,7 @@ from src.envs.graph_coloring.gc_baselines.ortools_policy import ORToolsOfflinePo
 from src.envs.graph_coloring.gc_baselines.simple_policies import random_policy_without_newcolor
 # import gc simulation -
 from src.envs.graph_coloring.gc_simulation.simulator import Simulator
-from src.envs.graph_coloring.gc_wrappers.gc_torch_geometric_wrappers import GraphOnlyColorsWrapper
+from src.envs.graph_coloring.gc_wrappers.gc_torch_geometric_wrappers import GraphWithColorsWrapper
 # import problem creator
 from src.envs.graph_coloring.gc_experimentation.problems import (create_fixed_static_problem,
                                                                  create_er_random_graph_problem)
@@ -72,7 +72,7 @@ def main():
     problem_name = 'gc'
     problem_type = 'er_offline'
     num_new_nodes = 0
-    num_initial_nodes = 100
+    num_initial_nodes = 15
     prob_edge = 0.3
     is_online = False
     random_seed = 0
@@ -89,7 +89,7 @@ def main():
     env = create_er_random_graph_problem(num_new_nodes=num_new_nodes, num_initial_nodes=num_initial_nodes,
                                          prob_edge=prob_edge, is_online=is_online, random_seed=random_seed)
 
-    env_tg = GraphOnlyColorsWrapper(env)
+    env_tg = GraphWithColorsWrapper(env)
     env_tg.reset()
 
     model_config = {
@@ -118,9 +118,9 @@ def main():
         'lr': 0.0001,
         'discount': 0.95,
         # number of episodes to do altogether
-        'number_of_episodes': 50025,
+        'number_of_episodes': 50000,
         # a batch is N episodes where N is number_of_episodes_in_batch
-        'number_of_episodes_in_batch': 15,  # this must be a division of number of episodes
+        'number_of_episodes_in_batch': 40,  # this must be a division of number of episodes
         'total_num_eval_seeds': 100,
         'num_eval_seeds': 10,
         'evaluate_every': 50,
@@ -136,7 +136,7 @@ def main():
         'logit_normalizer': 10,
         'problem_name': problem_name   # used for saving results
     }
-
+    model_config['logit_normalizer'] = agent_config['logit_normalizer']
     EVAL_BASELINES_RESULTS_FILENAME = (f"experiments/{problem_name}/"
                                        f"{agent_config['total_num_eval_seeds']}n-seeds_{num_initial_nodes}n_"
                                        f"{num_new_nodes}new_n_{prob_edge}p/"
@@ -149,7 +149,8 @@ def main():
                   'is_online': is_online,
                   'random_seed': random_seed,
                   'eval_baseline_results_filename': EVAL_BASELINES_RESULTS_FILENAME}
-    agent_config['run_name'] = f"ep_in_batch_{agent_config['number_of_episodes_in_batch']}_" \
+    agent_config['run_name'] = f"master_with_change_in_wrapper_and_get_loss_update" \
+                               f"_ep_in_batch_{agent_config['number_of_episodes_in_batch']}_" \
                                f"n_eval_{agent_config['num_eval_seeds']}_lr_{agent_config['lr']}"
     eval_seeds = list(range(agent_config['total_num_eval_seeds']))
     baseline_results_path = Path(EVAL_BASELINES_RESULTS_FILENAME)
