@@ -328,7 +328,7 @@ class PolicyFullyConnectedMessagePassing(torch.nn.Module):
         # in order to get the softmax on each batch separately the indexes for softmax are
         # the batch node indexes (since the actions are in the nodes)
         batch_scores[state_batch.illegal_actions] = -np.inf
-        batch_probabilities = tg_utils.softmax(batch_scores, state_batch.batch)
+        batch_probabilities = tg_utils.softmax(batch_scores, state_batch.batch.to(device="cpu"))
         cumulative_batch_actions = state_batch.action_chosen_index
         chosen_probabilities = batch_probabilities.gather(dim=0, index=cumulative_batch_actions.view(-1, 1))
         # calculate log after choosing from probability for numerical reasons
