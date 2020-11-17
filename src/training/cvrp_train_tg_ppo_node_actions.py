@@ -153,23 +153,23 @@ def main():
 
     agent_config = {
         'lr': 0.0001,
-        'discount': 0.90,
+        'discount': 0.95,
         # number of episodes to do altogether
-        'number_of_episodes': 50000,
+        'number_of_episodes': 500000,
         # a batch is N episodes where N is number_of_episodes_in_batch
-        'number_of_episodes_in_batch': 60,  # this must be a division of number of episodes
-        'total_num_eval_seeds': 2,
-        'num_eval_seeds': 2,
+        'number_of_episodes_in_batch': 150,  # this must be a division of number of episodes
+        'total_num_eval_seeds': 100,
+        'num_eval_seeds': 10,
         'evaluate_every': 50,
-        'num_train_seeds': 2,
+        'num_train_seeds': 1000,
         'reward_average_window_size': 10,
         'entropy_coeff': 0.01,  # consider decreasing this back
         'value_coeff': 0.3,
         'model_config': model_config,
         'save_checkpoint_every': 1000,
-        'eps_clip': 0.2,
-        'n_ppo_updates': 40,
-        'target_kl': 0.005,
+        'eps_clip': 0.5,
+        'n_ppo_updates': 80,
+        'target_kl': 0.0001,
         'logit_normalizer': 5,
         'problem_name': problem_name  # used for saving results
     }
