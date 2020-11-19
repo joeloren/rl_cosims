@@ -9,7 +9,7 @@ from scipy import stats
 from src.envs.cvrp.cvrp_baselines import simple_baseline
 from src.envs.cvrp.cvrp_utils.plot_results import plot_vehicle_routes
 from src.envs.cvrp.cvrp_simulation.scenario_generator import (FixedSample, SampleStaticBenchmark)
-from src.envs.cvrp.cvrp_simulation.simulator import CVRPSimulation
+from src.envs.cvrp.cvrp_simulation.simulator_all_customers_in_obs import CVRPSimulation
 
 
 def create_data_model(obs, env, precision=1000):

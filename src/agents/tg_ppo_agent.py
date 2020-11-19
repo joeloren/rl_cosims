@@ -11,13 +11,11 @@ import torch
 import torch.nn.functional as F
 import torch.optim as optim
 from pathlib import Path
-from torch.distributions import Categorical
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.utils.tensorboard import SummaryWriter
-from torch_geometric import data as tg_data, utils as tg_utils
 from typing import Dict, List, Tuple, Optional
 
-from src.models.tg_models import PolicyGNN
+from src.models.tg_edge_action_models import PolicyGNN
 from src.training.torch_utils import get_available_device
 
 
@@ -120,7 +118,6 @@ class PPOAgent:
             # TODO need to update time_to_learn to be based on number of batches
             if self.time_to_learn():
                 loss = self.learn()
-
             self.state = self.next_state  # this is to set the state for the next iteration
             self.episode_step_number += 1
         self.episode_number += 1
@@ -149,6 +146,8 @@ class PPOAgent:
         return action.item(), logprob.item(), value.item()
 
     def store_step(self, state, reward, action, log_prob, val):
+        # save action as action_index (this is used if action is in the nodes)
+        state.action_chosen_index = torch.tensor([action], device=state.x.device, dtype=torch.long)
         self.batch_states.append(state)
         if reward is not None:
             self.episode_rewards.append(self.reward)
@@ -202,7 +201,7 @@ class PPOAgent:
         self.writer.add_scalar('Train/lr', self.optimizer.state_dict()['param_groups'][0]['lr'], self.episode_number)
         self.writer.add_scalar('Train/AverageLogProb_data_collection', torch.mean(torch.tensor(self.batch_log_probs)),
                                self.episode_number)
-        self.writer.add_scalar('Train/AverageLogProb_train', torch.mean(torch.tensor(chosen_logprobs_train)),
+        self.writer.add_scalar('Train/AverageLogProb_train', torch.mean(torch.tensor(chosen_logprobs_train)).item(),
                                self.episode_number)
         self.writer.add_scalar('Train/MinRTGs', torch.min(torch.tensor(self.batch_rtgs)), self.episode_number)
         self.writer.add_scalar('Train/MaxRTGs', torch.max(torch.tensor(self.batch_rtgs)), self.episode_number)
@@ -252,9 +251,10 @@ class PPOAgent:
         total_loss = policy_loss + entropy_loss + value_loss
         mean_kl = (original_logprobs - chosen_logprob).mean().detach().cpu().item()
 
-        self.writer.add_scalar('Train/Loss/value', value_loss, self.episode_number)
-        self.writer.add_scalar('Train/Loss/policy', policy_loss.mean(), self.episode_number)
-        self.writer.add_scalar('Train/Loss/entropy', entropy_loss, self.episode_number)
+        self.writer.add_scalar('Train/Loss/value', value_loss.item(), self.episode_number)
+        self.writer.add_scalar('Train/Loss/policy', policy_loss.mean().item(), self.episode_number)
+        self.writer.add_scalar('Train/Loss/entropy', entropy_loss.item(), self.episode_number)
+        self.writer.add_scalar('Train/mean_kl', mean_kl, self.episode_number)
         # self.writer.add_scalar('Train/Loss/total', total_loss, self.episode_number)
         return total_loss, chosen_logprob, mean_kl
 

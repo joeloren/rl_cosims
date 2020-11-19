@@ -50,7 +50,7 @@ class GeometricWrapper(Wrapper):
         obs = self.env.observation(obs)
         return self.obs_to_graph_dict(obs)
 
-    def obs_to_graph(self, obs) -> tg.data.Data:
+    def obs_to_graph_dict(self, obs) -> tg.data.Data:
         """
         this function takes the observation and creates a graph including the following
         features:
@@ -252,3 +252,106 @@ class ObservationNormalizationWrapper(ObservationWrapper):
         value = value + mean
 
         return value
+
+
+class GeometricFullyConnectedWrapper(Wrapper):
+
+    def __init__(self, env):
+        super().__init__(env)
+        self.num_nodes = 0
+        self.num_customers = 0
+        self.action_to_simulation_action_dict = {}
+
+    def reset(self):
+        """
+        this function resets the environment and the wrapper
+        :return: tg_obs: tg.Data - graph with all features as a torch geometric graph
+        """
+        # reset env -
+        obs = self.env.reset()
+        self.action_to_simulation_action_dict = {}
+        self.num_customers = 0
+        # create tg observation from obs dictionary -
+        tg_obs = self.observation(obs)
+        return tg_obs
+
+    def step(self, reinforce_action):
+        """
+        this function first translates the action chosen by the agent (in our case the action is an edge in the graph)
+        from ppo action to env action, then steps through the env and translates the observation from dictionary to
+        tg observation (tg graph)
+        the reward is the negative distance the vehicle travelled between its current position and the chosen position
+        :param reinforce_action: int - edge chosen by agent
+        :return: tg_obs: tg.Data, reward: double, done: bool. info: Dict
+        """
+        # edge chosen goes from vehicle to node (which is either the depot or the customer chosen)
+        _, node_chosen = self.action_to_simulation_action_dict[reinforce_action]
+        if node_chosen == self.num_customers:
+            action = self.num_nodes + self.env.DEPOT_INDEX
+        else:
+            action = node_chosen
+        next_state, reward, done, _ = self.env.step(action)
+        tg_obs = self.observation(next_state)
+        return tg_obs, reward, done, {}
+
+    def observation(self, obs):
+        obs = self.env.observation(obs)
+        return self.obs_to_graph_dict(obs)
+
+    def obs_to_graph_dict(self, obs) -> tg.data.Data:
+        """
+        this function takes the observation and creates a graph including the following
+        features:
+        (indicator, x, y, node_demand)
+        indicator: 0: customers, 1: depot, 2: vehicles
+        x, y: position of the node in grid (double, double)
+        node_demand: the customer demand or current vehicle capacity depending on the type of node (the vehicle
+        capacity is negative)
+        """
+        # # if creating bipartite graph with only vehicles and customers use the following code:
+        # there are 4 features all together :
+        customer_positions = obs['customer_positions']
+        customer_demands = obs['customer_demands']
+        vehicle_capacity = obs['current_vehicle_capacity']
+        vehicle_position = obs['current_vehicle_position']
+        num_customers = customer_positions.shape[0]
+        num_vehicles = 1
+        num_depots = 1
+        num_nodes = num_customers + num_vehicles + num_depots
+        node_pos = np.vstack([customer_positions,
+                              obs['depot_position'],
+                              vehicle_position])
+        # indicator is : 0: vehicles, 1: depot, 2: customers
+        node_ind = np.vstack([np.ones(shape=(num_customers, 1)) * 0,
+                              np.ones(shape=(num_depots, 1)) * 1,
+                              np.ones(shape=(num_vehicles, 1)) * 2])
+        node_demand = np.vstack([customer_demands.reshape(-1, 1),
+                                 np.zeros(shape=(num_depots, 1)),
+                                 -vehicle_capacity])
+        # features are : indicator, pos_x, pos_y, demand/capacity
+        node_features = np.hstack([node_ind, node_pos, node_demand])
+        # customer edge indexes include all customers and depot
+        customer_edge_indexes = [(i, j) for i, j in itertools.product(range(num_customers+1), range(num_customers+1)) if
+                                 i != j]
+        # add constraint edges
+        customer_constraint_edge_indexes = [(i + num_customers + num_depots, j) for i in range(num_vehicles)
+                                            for j in range(num_customers) if obs['action_mask'][j]]
+        depot_constraint_edge_indexes = [(i + num_customers + num_depots, j + num_customers) for i in
+                                         range(num_vehicles)
+                                         for j in range(num_depots) if obs['action_mask'][self.env.DEPOT_INDEX]]
+        edge_indexes = customer_edge_indexes + customer_constraint_edge_indexes + depot_constraint_edge_indexes
+        edge_attributes = np.zeros(shape=(len(edge_indexes), 1))
+        edge_attributes[len(customer_edge_indexes):] = 1
+        node_features_tensor = torch.tensor(node_features, dtype=torch.float32)
+        edge_indexes_tensor = torch.tensor(edge_indexes, dtype=torch.long,
+                                           device=node_features_tensor.device).transpose(1, 0)
+        edge_attributes_tensor = torch.tensor(edge_attributes, device=node_features_tensor.device, dtype=torch.float32)
+        illegal_actions = torch.logical_not(edge_attributes_tensor.view(-1))
+        graph_tg = tg.data.Data(x=node_features_tensor, edge_attr=edge_attributes_tensor,
+                                edge_index=edge_indexes_tensor)
+        graph_tg.illegal_actions = illegal_actions
+        graph_tg.u = torch.tensor([[1]], device=node_features_tensor.device, dtype=torch.float32)
+        self.num_nodes = graph_tg.x.shape[0]
+        self.num_customers = num_customers
+        self.action_to_simulation_action_dict = {i: (u, v) for i, (u, v) in enumerate(edge_indexes)}
+        return graph_tg
