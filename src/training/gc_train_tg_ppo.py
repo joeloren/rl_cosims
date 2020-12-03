@@ -18,7 +18,7 @@ from src.envs.graph_coloring.gc_experimentation.problems import (create_fixed_st
                                                                  create_er_random_graph_problem)
 # import RL algorithm -
 from src.agents.tg_ppo_agent import PPOAgent
-from src.models.tg_models import PolicyGNN as PolicyModel
+from src.models.tg_edge_action_models import PolicyGNN as PolicyModel
 
 
 def evaluate_policy_simple(problem: Simulator,
@@ -72,7 +72,7 @@ def main():
     problem_name = 'gc'
     problem_type = 'er_offline'
     num_new_nodes = 0
-    num_initial_nodes = 15
+    num_initial_nodes = 20
     prob_edge = 0.3
     is_online = False
     random_seed = 0
@@ -116,7 +116,7 @@ def main():
 
     agent_config = {
         'lr': 0.0001,
-        'discount': 0.95,
+        'discount': 1.0,
         # number of episodes to do altogether
         'number_of_episodes': 50000,
         # a batch is N episodes where N is number_of_episodes_in_batch
@@ -124,7 +124,7 @@ def main():
         'total_num_eval_seeds': 100,
         'num_eval_seeds': 10,
         'evaluate_every': 50,
-        'num_train_seeds': 100,
+        'num_train_seeds': 1000,
         'reward_average_window_size': 10,
         'entropy_coeff': 0.01,  # consider decreasing this back
         'value_coeff': 0.3,
