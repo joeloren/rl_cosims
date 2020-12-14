@@ -122,7 +122,7 @@ class ORToolsOfflinePolicy:
             edges = obs["edge_indexes"]
             found_solution = False
             num_iters = 0
-            for i in range(np.min([len(nodes), 4]), len(nodes)+1):
+            for i in range(np.min([len(nodes), 3]), len(nodes)+1):
                 max_num_colors = i
                 if self.verbose:
                     print(f"trying to solve or-tools with maximum colors:{i} , num nodes:{len(nodes)}")

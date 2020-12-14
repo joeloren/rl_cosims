@@ -1,6 +1,6 @@
 {
   "num_new_nodes": 0,
-  "num_initial_nodes": 200,
+  "num_initial_nodes": 20,
   "prob_edge": 0.3,
   "is_online": false
 }
