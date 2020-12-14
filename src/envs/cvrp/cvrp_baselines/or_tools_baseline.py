@@ -19,20 +19,21 @@ def create_data_model(obs, env, precision=1000):
     _locations = [
         obs["depot_position"] * precision,  # depot
     ]
-    num_customers = env.get_opened_customers().size
+    opened_not_visited_customers_ids = obs['customer_ids'][np.logical_not(obs['customer_visited'])]
+    num_customers = opened_not_visited_customers_ids.size
     _locations.extend(
-        [obs["customer_positions"][i, :] * precision for i in range(num_customers)]
+        [obs["customer_positions"][i, :] * precision for i in opened_not_visited_customers_ids]
     )  # locations to visit
     data["locations"] = _locations
     data["num_locations"] = len(data["locations"])
     data["demands"] = [0]  # depot
     # customers demands
-    data["demands"].extend([obs["customer_demands"][i] for i in range(num_customers)])
+    data["demands"].extend([obs["customer_demands"][i] for i in opened_not_visited_customers_ids])
     data["vehicle_capacity"] = _capacity
     data["depot"] = 0
     data["num_customers"] = num_customers
     data["ids"] = [-1]  # depot
-    data["ids"].extend([obs["customer_ids"][i] for i in range(num_customers)])
+    data["ids"].extend([obs["customer_ids"][i] for i in opened_not_visited_customers_ids])
     return data
 
 

@@ -206,10 +206,11 @@ class SweepPolicy:
 
     def compute_route(self, obs, env):
         depot_position = obs["depot_position"]
-        customer_positions = obs["customer_positions"]
+        customers_not_visited = np.logical_not(obs['customer_visited'])
+        customer_positions = obs["customer_positions"][customers_not_visited]
         num_customers = customer_positions.shape[0]
-        customer_ids = obs["customer_ids"].reshape(num_customers, 1)
-        customer_demands = obs["customer_demands"].reshape(num_customers, 1)
+        customer_ids = obs["customer_ids"][customers_not_visited].reshape(num_customers, 1)
+        customer_demands = obs["customer_demands"][customers_not_visited].reshape(num_customers, 1)
         vehicle_capacity = obs["current_vehicle_capacity"]
         customer_data = np.hstack([customer_positions, customer_demands, customer_ids])
         depot_data = np.hstack([depot_position, np.array([0]), np.array([-2])])
