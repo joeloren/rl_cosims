@@ -1,15 +1,15 @@
 import numpy as np
 from src.envs.cvrp.cvrp_distributions.mixture_distribution import MixtureModel, TruncatedGaussian2D
 from src.envs.cvrp.cvrp_simulation.scenario_generator import FixedSample, SampleDynamicBenchmark
-from src.envs.cvrp.cvrp_simulation.simulator_all_customers_in_obs import CVRPSimulation
+from src.envs.cvrp.cvrp_simulation.multiple_vehicle_cvrp import CVRPSimulation
 from scipy import stats
 
 
 def create_fixed_static_problem(
     customer_positions: list,
     depot_position: list,
-    initial_vehicle_position: list,
-    initial_vehicle_capacity: int,
+    initial_vehicle_positions: list,
+    initial_vehicle_capacities: list,
     vehicle_velocity: int,
     customer_demands: list,
     customer_times: list,
@@ -18,37 +18,52 @@ def create_fixed_static_problem(
     Creates a minimal instance with fixed parameters
     :return:
     """
+    initial_vehicle_capacities = np.array(initial_vehicle_capacities)
     customer_positions = np.array(customer_positions)
     depot_position = np.array(depot_position)
-    initial_vehicle_position = np.array(initial_vehicle_position)
+    num_vehicles = len(initial_vehicle_positions)
+    initial_vehicle_positions = np.array(initial_vehicle_positions).reshape(num_vehicles, 2)
     customer_demands = np.array(customer_demands)
     customer_times = np.array(customer_times)
     max_customers = customer_times.size
     problem_generator = FixedSample(
-        depot_position,
-        initial_vehicle_position,
-        initial_vehicle_capacity,
-        vehicle_velocity,
-        customer_positions,
-        customer_demands,
-        customer_times,
+        depot_position=depot_position,
+        vehicle_positions=initial_vehicle_positions,
+        vehicle_capacities=initial_vehicle_capacities,
+        vehicle_velocity=vehicle_velocity,
+        num_vehicles=num_vehicles,
+        customer_positions=customer_positions,
+        customer_demands=customer_demands,
+        customer_times=customer_times
     )
     sim = CVRPSimulation(max_customers=max_customers, problem_generator=problem_generator)
     return sim
 
 
 def create_uniform_dynamic_problem(
-    max_customer_times,
-    size: int,
-    vehicle_velocity: int,
-    vehicle_capacity: int,
-    max_demand: int,
-    random_seed: int,
-    start_at_depot: bool,
-):
+        max_customer_times,
+        size: int,
+        num_vehicles: int,
+        vehicle_velocity: int,
+        vehicle_capacity: int,
+        max_demand: int,
+        random_seed: int,
+        start_at_depot: bool):
+    """
+    this function creates a uniform distribution simulation and problem generator
+    :param max_customer_times: maximum time customers can appear opened
+    :param size: total number of customers
+    :param num_vehicles: number of vehicles in problem
+    :param vehicle_velocity: vehicle velocity in each direction (x, y)
+    :param vehicle_capacity: maximum capacity of vehicles (we assume all vehicles start with the same capacity)
+    :param max_demand: maximum demand a customer will have
+    :param random_seed: random seed for problem generator
+    :param start_at_depot: if vehicles should start at the depot
+    :return: simulation with relevant problem generator and initial state
+    """
     np.random.seed(random_seed)
     depot_position_rv = stats.uniform(loc=0, scale=1)
-    vehicle_position_rv = stats.uniform(loc=0, scale=1)
+    vehicle_positions_rv = stats.uniform(loc=0, scale=1)
     customer_positions_rv = stats.uniform(loc=0, scale=1)
     customer_demands_rv = stats.randint(low=1, high=max_demand)
     if max_customer_times == 0:
@@ -58,33 +73,35 @@ def create_uniform_dynamic_problem(
         customer_times_rv = stats.randint(low=0, high=max_customer_times)
     dynamic_generator = SampleDynamicBenchmark(
         depot_position_rv=depot_position_rv,
-        vehicle_position_rv=vehicle_position_rv,
+        vehicle_positions_rv=vehicle_positions_rv,
         vehicle_capacity=vehicle_capacity,
         vehicle_velocity=vehicle_velocity,
         customer_positions_rv=customer_positions_rv,
         customer_demands_rv=customer_demands_rv,
         customer_times_rv=customer_times_rv,
         vrp_size=size,
+        num_vehicles=num_vehicles,
         start_at_depot=start_at_depot,
     )
     sim = CVRPSimulation(max_customers=size, problem_generator=dynamic_generator)
     return sim
 
 
-def create_mixture_guassian_dynamic_problem(
-    max_customer_times: int,
-    size: int,
-    vehicle_velocity: int,
-    vehicle_capacity: int,
-    max_demand: int,
-    random_seed: int,
-    start_at_depot: bool,
-    distributions_params: dict,
-):
+def create_mixture_gaussian_dynamic_problem(
+        max_customer_times: int,
+        size: int,
+        num_vehicles: int,
+        vehicle_velocity: int,
+        vehicle_capacity: int,
+        max_demand: int,
+        random_seed: int,
+        start_at_depot: bool,
+        distributions_params: dict):
     """
     this function creates a simulation based on given gaussian parameters for spatial distribution
     :param max_customer_times: maximum time for customer to arrive
     :param size - size of problem (graph size)
+    :param num_vehicles - number of vehicles in problem [int]
     :param vehicle_capacity - initial vehicle capacity (this will also be the capacity when the vehicle returns to depot
     :param vehicle_velocity - vehicle velocity, this determins the simulation time since when the
     vehicle goes to a customer the time will be : distance*vehicle_velocity
@@ -108,7 +125,7 @@ def create_mixture_guassian_dynamic_problem(
     customer_positions_rv = MixtureModel(position_trunc_gaussian_2d,
                                          distributions_params["weights"]["customer_positions"], 0, 1,)
     depot_position_rv = stats.uniform(loc=0, scale=1)
-    vehicle_position_rv = stats.uniform(loc=0, scale=1)
+    vehicle_positions_rv = stats.uniform(loc=0, scale=1)
     customer_demands_rv = stats.randint(low=1, high=max_demand)
     if max_customer_times == 0:
         # need to take care of this case separately.
@@ -125,13 +142,14 @@ def create_mixture_guassian_dynamic_problem(
             customer_times_rv = stats.randint(low=0, high=max_customer_times)
     dynamic_generator = SampleDynamicBenchmark(
         depot_position_rv=depot_position_rv,
-        vehicle_position_rv=vehicle_position_rv,
+        vehicle_positions_rv=vehicle_positions_rv,
         vehicle_capacity=vehicle_capacity,
         vehicle_velocity=vehicle_velocity,
         customer_positions_rv=customer_positions_rv,
         customer_demands_rv=customer_demands_rv,
         customer_times_rv=customer_times_rv,
         vrp_size=size,
+        num_vehicles=num_vehicles,
         start_at_depot=start_at_depot,
     )
     sim = CVRPSimulation(max_customers=size, problem_generator=dynamic_generator)

@@ -6,7 +6,7 @@ import numpy as np
 from scipy import stats
 # our imports
 from src.envs.cvrp.cvrp_distributions.mixture_distribution import MixtureModel
-from src.envs.cvrp.cvrp_simulation.simulator import State
+from src.envs.cvrp.cvrp_simulation.multiple_vehicle_cvrp import State
 
 
 class ScenarioGenerator(ABC):
@@ -32,15 +32,16 @@ class SampleStaticBenchmark(ScenarioGenerator):
     """
 
     def __init__(
-        self,
-        depot_position_rv: stats._distn_infrastructure.rv_generic,
-        vehicle_position_rv: stats._distn_infrastructure.rv_generic,
-        vehicle_capacity: stats._distn_infrastructure.rv_generic,
-        vehicle_velocity: stats._distn_infrastructure.rv_generic,
-        customer_positions_rv: stats._distn_infrastructure.rv_generic,
-        customer_demands_rv: stats._distn_infrastructure.rv_generic,
-        vrp_size: int,
-        start_at_depot: bool = False,
+            self,
+            depot_position_rv: stats._distn_infrastructure.rv_generic,
+            vehicle_position_rv: stats._distn_infrastructure.rv_generic,
+            vehicle_capacity: stats._distn_infrastructure.rv_generic,
+            vehicle_velocity: stats._distn_infrastructure.rv_generic,
+            customer_positions_rv: stats._distn_infrastructure.rv_generic,
+            customer_demands_rv: stats._distn_infrastructure.rv_generic,
+            vrp_size: int,
+            num_vehicles: int,
+            start_at_depot: bool = False,
     ) -> None:
         """A ScenarioGenerator for the cvrp problem which generates a random problem each time based on distributions
         wanted for each variable
@@ -51,6 +52,7 @@ class SampleStaticBenchmark(ScenarioGenerator):
         :param customer_positions_rv: customer positions (scipy) random variable,
         :param customer_demands_rv: customer demands (scipy) random variable,
         :param vrp_size: number of customers [int]
+        :param num_vehicles: number of vehicles [int]
         :param start_at_depot: if `True`, the initial position of the vehicle is the depot, else drawn from
         `vehicle_position_rv`
         """
@@ -58,10 +60,12 @@ class SampleStaticBenchmark(ScenarioGenerator):
         self.depot_position_rv = depot_position_rv
         self.vehicle_position_rv = vehicle_position_rv
         self.vehicle_capacity = vehicle_capacity
+        self.max_vehicle_capacity = vehicle_capacity
         self.vehicle_velocity = vehicle_velocity
         self.customer_positions_rv = customer_positions_rv
         self.customer_demands_rv = customer_demands_rv
         self.vrp_size = vrp_size
+        self.num_vehicles = num_vehicles
         self.start_at_depot = start_at_depot
 
     def reset(self) -> State:
@@ -70,18 +74,25 @@ class SampleStaticBenchmark(ScenarioGenerator):
         :return: state [State] - new problem state
         """
         depot_pos = self.depot_position_rv.rvs(2)
+        if self.start_at_depot:
+            current_vehicle_positions = np.tile(deepcopy(depot_pos), (self.num_vehicles, 1))
+        else:
+            current_vehicle_positions = self.vehicle_position_rv.rvs([self.num_vehicles, 2])
         state = State(
             depot_position=deepcopy(depot_pos),  # [x,y]
-            current_vehicle_position=deepcopy(depot_pos)
-            if self.start_at_depot
-            else self.vehicle_position_rv.rvs(2),  # [x,y]
-            current_vehicle_capacity=self.vehicle_capacity,
+            current_vehicle_positions=current_vehicle_positions,  # [x,y] for each vehicle 0, 1, ... M
+            current_vehicle_capacities=np.tile(self.vehicle_capacity, self.num_vehicles),
             vehicle_velocity=self.vehicle_velocity,
-            customer_positions=self.customer_positions_rv.rvs([self.vrp_size, 2]),   # [x,y] for each customer 0, 1,..N
+            customer_positions=self.customer_positions_rv.rvs([self.vrp_size, 2]),  # [x,y] for each customer 0, 1,..N
             customer_demands=self.customer_demands_rv.rvs(self.vrp_size),  # [N]
             customer_times=np.zeros(self.vrp_size).astype(int),
             customer_ids=np.arange(0, self.vrp_size).astype(np.int),
-            customer_visited=np.zeros(self.vrp_size).astype(np.bool)  # all customers start as not visited
+            customer_status=np.zeros(self.vrp_size).astype(np.int),  # all customers start as idle
+            vehicle_status=np.zeros(self.num_vehicles).astype(np.int),
+            previous_time=0,
+            current_vehicle_customer=np.array([None] * self.num_vehicles),
+            vehicle_full_distance=np.zeros(self.num_vehicles),
+            vehicle_full_path={k: [] for k in range(self.num_vehicles)}
         )
         return state
 
@@ -109,21 +120,22 @@ class SampleDynamicBenchmark(ScenarioGenerator):
     """
 
     def __init__(
-        self,
-        depot_position_rv: stats._distn_infrastructure.rv_generic,
-        vehicle_position_rv: stats._distn_infrastructure.rv_generic,
-        vehicle_capacity: stats._distn_infrastructure.rv_generic,
-        vehicle_velocity: stats._distn_infrastructure.rv_generic,
-        customer_positions_rv: stats._distn_infrastructure.rv_generic,
-        customer_demands_rv: stats._distn_infrastructure.rv_generic,
-        customer_times_rv: stats._distn_infrastructure.rv_generic,
-        vrp_size: int,
-        start_at_depot: bool,
+            self,
+            depot_position_rv: stats._distn_infrastructure.rv_generic,
+            vehicle_positions_rv: stats._distn_infrastructure.rv_generic,
+            vehicle_capacity: stats._distn_infrastructure.rv_generic,
+            vehicle_velocity: stats._distn_infrastructure.rv_generic,
+            customer_positions_rv: stats._distn_infrastructure.rv_generic,
+            customer_demands_rv: stats._distn_infrastructure.rv_generic,
+            customer_times_rv: stats._distn_infrastructure.rv_generic,
+            vrp_size: int,
+            num_vehicles: int,
+            start_at_depot: bool,
     ) -> None:
         """A ScenarioGenerator for the cvrp problem which generates a random problem
         each time based on distributions wanted for each variable
         :param depot_position_rv: the depot position (scipy) random variable
-        :param vehicle_position_rv: the vehicles starting position (scipy) random variable
+        :param vehicle_positions_rv: the vehicles starting position (scipy) random variable
         :param vehicle_capacity: the vehicles total capacity [int], for now this is constant
          and pre-defined
         :param vehicle_velocity: the vehicles velocity [int], for now this is constant
@@ -133,18 +145,21 @@ class SampleDynamicBenchmark(ScenarioGenerator):
         :param customer_demands_rv: customer demands (scipy) random variable,
         :param customer_times_rv: customer start times (scipy) random variable,
         :param vrp_size: number of customers [int]
+        :param num_vehicles: number of vehicles in problem [int]
         :param start_at_depot: if `True`, the initial position of the vehicle is the depot,
          else drawn from `vehicle_position_rv`
         """
         super().__init__()
         self.depot_position_rv = depot_position_rv
-        self.vehicle_position_rv = vehicle_position_rv
+        self.vehicle_positions_rv = vehicle_positions_rv
         self.vehicle_capacity = vehicle_capacity
+        self.max_vehicle_capacity = vehicle_capacity
         self.vehicle_velocity = vehicle_velocity
         self.customer_positions_rv = customer_positions_rv
         self.customer_demands_rv = customer_demands_rv
         self.customer_times_rv = customer_times_rv
         self.vrp_size = vrp_size
+        self.num_vehicles = num_vehicles
         self.start_at_depot = start_at_depot
 
     def reset(self) -> State:
@@ -159,23 +174,25 @@ class SampleDynamicBenchmark(ScenarioGenerator):
         else:
             customer_positions = self.customer_positions_rv.rvs([self.vrp_size, 2])
         customer_times = np.sort(self.customer_times_rv.rvs(self.vrp_size))
+        if self.start_at_depot:
+            current_vehicle_positions = np.tile(deepcopy(depot_pos), (self.num_vehicles, 1))
+        else:
+            current_vehicle_positions = self.vehicle_positions_rv.rvs([self.num_vehicles, 2])
         state = State(
             depot_position=deepcopy(depot_pos),  # [x,y]
-            current_vehicle_position=deepcopy(depot_pos)
-            if self.start_at_depot
-            else self.vehicle_position_rv.rvs(2),
-            # [x,y]
-            current_vehicle_capacity=self.vehicle_capacity,
+            current_vehicle_positions=current_vehicle_positions,  # [x,y] for each vehicle 0, 1, ... M
+            current_vehicle_capacities=np.tile(self.vehicle_capacity, self.num_vehicles),
             vehicle_velocity=self.vehicle_velocity,
-            customer_positions=deepcopy(
-                customer_positions
-            ),  # [x,y] for each customer 0, 1,..N
+            customer_positions=deepcopy(customer_positions),  # [x,y] for each customer 0, 1,..N
             customer_demands=self.customer_demands_rv.rvs(self.vrp_size),  # [N]
             customer_times=customer_times,  # [N] this is the start time of each customer
             customer_ids=np.arange(0, self.vrp_size).astype(np.int),
-            customer_visited=np.zeros(self.vrp_size).astype(np.bool),
-            current_vehicle_customer=self.vrp_size
-            # all customers start as not visited
+            customer_status=np.zeros(self.vrp_size).astype(np.int),
+            vehicle_status=np.zeros(self.num_vehicles).astype(np.int),
+            current_vehicle_customer=np.array([None]*self.num_vehicles),
+            previous_time=0,
+            vehicle_full_distance=np.zeros(self.num_vehicles),
+            vehicle_full_path={k: [] for k in range(self.num_vehicles)}
         )
         return state
 
@@ -263,7 +280,7 @@ class SampleDynamicBenchmark(ScenarioGenerator):
         else:
             n_missing_customers = n_customer_to_create - indexs_to_use.size
             customer_times_used[: indexs_to_use.size] = customer_times[indexs_to_use]
-            customer_times_used[indexs_to_use.size:] = np.random.uniform(t, self.customer_times_rv.b )
+            customer_times_used[indexs_to_use.size:] = np.random.uniform(t, self.customer_times_rv.b)
             print(
                 f"ran 100 times and did not find a time for "
                 f"{n_missing_customers} future customers that is larger than current time:"
@@ -283,20 +300,22 @@ class FixedSample(ScenarioGenerator):
     """
 
     def __init__(
-        self,
-        depot_position: np.ndarray,
-        vehicle_position: np.ndarray,
-        vehicle_capacity: int,
-        vehicle_velocity: int,
-        customer_positions: np.ndarray,
-        customer_demands: np.ndarray,
-        customer_times: np.ndarray,
+            self,
+            depot_position: np.ndarray,
+            vehicle_positions: np.ndarray,
+            vehicle_capacities: np.ndarray,
+            vehicle_velocity: int,
+            num_vehicles: int,
+            customer_positions: np.ndarray,
+            customer_demands: np.ndarray,
+            customer_times: np.ndarray,
     ) -> None:
         """
         initializing each variable with wanted numbers
         :param depot_position: position of depot [x, y]
-        :param vehicle_position: vehicle starting position [x, y]
-        :param vehicle_capacity: vehicle maximum capacity [int]
+        :param num_vehicles: number of vehicles in problem [int]
+        :param vehicle_positions: vehicle starting position [x, y]
+        :param vehicle_capacities: vehicle maximum capacity [int]
         :param vehicle_velocity: vehicle velocity (needed for calculation step time) [int]
         :param customer_positions: customer positions, each row [x, y] and vector is [N, 2]
         :param customer_demands: customer demands [N]
@@ -305,13 +324,15 @@ class FixedSample(ScenarioGenerator):
         """
         super().__init__()
         self.depot_position = depot_position
-        self.vehicle_position = vehicle_position
-        self.vehicle_capacity = vehicle_capacity
+        self.vehicle_positions = vehicle_positions
+        self.vehicle_capacities = vehicle_capacities
+        self.max_vehicle_capacity = np.max(vehicle_capacities).item()
         self.vehicle_velocity = vehicle_velocity
         self.customer_positions = customer_positions
         self.customer_demands = customer_demands
         self.customer_times = customer_times
         self.vrp_size = customer_demands.size  # total number of customers in the problem [int]
+        self.num_vehicles = num_vehicles
 
     def reset(self) -> State:
         """
@@ -320,15 +341,19 @@ class FixedSample(ScenarioGenerator):
         """
         state = State(
             depot_position=self.depot_position,
-            current_vehicle_position=self.vehicle_position,
-            current_vehicle_capacity=self.vehicle_capacity,
+            current_vehicle_positions=self.vehicle_positions,
+            current_vehicle_capacities=self.vehicle_capacities,
             vehicle_velocity=self.vehicle_velocity,
             customer_positions=self.customer_positions,
             customer_demands=self.customer_demands,
             customer_times=self.customer_times,
             customer_ids=np.arange(0, self.vrp_size).astype(np.int),
-            customer_visited=np.zeros(self.vrp_size).astype(np.bool),
-            current_vehicle_customer=self.vrp_size
+            customer_status=np.zeros(self.vrp_size).astype(np.int),
+            vehicle_status=np.zeros(self.num_vehicles).astype(np.int),
+            current_vehicle_customer=np.array([None]*self.num_vehicles),
+            previous_time=0,
+            vehicle_full_distance=np.zeros(self.num_vehicles),
+            vehicle_full_path={k: [] for k in range(self.num_vehicles)}
         )
         return state
 

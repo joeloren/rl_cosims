@@ -147,8 +147,8 @@ class CVRPSimulation(Env):
             # to do if in the future we want to update the reward to include time, this also needs to be updated
             traveled_distance += np.linalg.norm(self.current_state.current_vehicle_position -
                                                 self.current_state.depot_position)
-        # next time is found based on: delta_time = travel_distance * vehicle_velocity  (t = v*x)
-        self.current_time += traveled_distance * self.current_state.vehicle_velocity
+        # next time is found based on: delta_time = travel_distance / vehicle_velocity  (t = v*x)
+        self.current_time += traveled_distance / self.current_state.vehicle_velocity
         # in the future might want to make a more sophisticated reward for the dynamic problem
         reward = -traveled_distance
         return self.current_state_to_observation(), reward, is_done, {}

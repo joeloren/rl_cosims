@@ -21,7 +21,7 @@ from src.envs.cvrp.cvrp_utils.plot_results import plot_vehicle_routes
 from src.envs.cvrp.cvrp_experimentation.problems import (
     create_fixed_static_problem,
     create_uniform_dynamic_problem,
-    create_mixture_guassian_dynamic_problem,
+    create_mixture_gaussian_dynamic_problem,
 )
 from src.envs.cvrp.cvrp_baselines.sweep_baseline import SweepPolicy
 from src.envs.cvrp.cvrp_policies.ppo_policy import PPOPolicy
@@ -184,7 +184,7 @@ def main():
                                                                        random_seed=args.start_seed + seed)
                 for seed in range(args.num_seeds)}
     elif args.problem == "dynamic_mixture_gaussian":
-        envs = {args.start_seed + seed: create_mixture_guassian_dynamic_problem(**problem_params,
+        envs = {args.start_seed + seed: create_mixture_gaussian_dynamic_problem(**problem_params,
                                                                                 random_seed=args.start_seed + seed)
                 for seed in range(args.num_seeds)}
     elif args.problem == "static_fixed":
