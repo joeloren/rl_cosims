@@ -4,8 +4,11 @@ from src.envs.graph_coloring.gc_experimentation.problems import (create_fixed_st
                                                                  create_er_random_graph_problem)
 from src.envs.graph_coloring.gc_baselines.simple_policies import random_policy, random_policy_without_newcolor
 from src.envs.graph_coloring.gc_baselines.ortools_policy import ORToolsOfflinePolicy
-from src.envs.graph_coloring.gc_utils.graph_utils import create_graph_from_observation
-from src.envs.graph_coloring.gc_utils.graph_utils import add_color_nodes_to_graph
+from src.envs.graph_coloring.gc_utils.graph_utils import (create_graph_from_observation, add_color_nodes_to_graph,
+                                                          create_subproblem_from_partial_solution)
+from src.envs.graph_coloring.gc_utils.plot_results import plot_gc_solution
+
+from matplotlib import pyplot as plt
 
 
 def test_fixed_problem():
@@ -240,3 +243,26 @@ def test_color_adjacency_matrix():
             assert np.all(node_color == node_color[0])
             neighbor_colors = adj_matrix[r, adj_matrix[r, :] != -9999]
             assert set(node_color) not in set(neighbor_colors)
+
+
+def test_repair_preperation():
+    # test if reset works
+    np.random.seed(0)
+    nodes = [i for i in range(10)]
+    edges = [(u, v) for u in range(5) for v in range(5, 10) if np.random.random() < 0.5]
+    env = create_fixed_static_problem(nodes_ids=nodes, edge_indexes=edges)
+
+    obs = env.reset()
+    is_done = False
+    i = 0
+    while not is_done:
+        # color each node with a color matching it's id
+        obs, reward, is_done, _ = env.step((i, i))
+        print(f"current time is:{obs['current_time']}, num_nodes:{len(obs['node_colors'])}")
+        i += 1
+    new_graph = env.current_state.graph.copy()
+    new_graph.nodes[1]['color'] = -1
+    new_graph.nodes[9]['color'] = -1
+    subproblem_graph = create_subproblem_from_partial_solution(new_graph)
+
+    print('hi')

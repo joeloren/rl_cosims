@@ -1,5 +1,6 @@
+from collections import defaultdict
 from copy import deepcopy
-from typing import Dict
+from typing import Dict, List
 
 import numpy as np
 import networkx as nx
@@ -75,3 +76,30 @@ def add_color_nodes_to_graph(obs: Dict, with_attributes: bool = True) -> nx.Grap
         nx.set_node_attributes(graph_nx, att)
         nx.set_edge_attributes(graph_nx, extra_edge_att)
     return graph_nx
+
+
+def destroy_graph_solution(nodes_to_destroy: List[int], graph: nx.Graph) -> nx.Graph:
+    """
+    this method destroys part of a full solution of a graph based on the list of nodes given
+    """
+    for n in nodes_to_destroy:
+        graph.nodes[n]['color'] = -1
+    return graph
+
+
+def create_subproblem_from_partial_solution(graph: nx.Graph):
+    unique_colors = set([c for i, c in graph.nodes('color') if c != -1])
+    max_color_index = np.max(unique_colors)
+    uncolored_nodes = [i_n for i_n, c in graph.nodes('color') if c == -1]
+    node_constraints = defaultdict(set)
+    for n in uncolored_nodes:
+        for neighbor_node in graph.neighbors(n):
+            neighbor_color = graph.nodes[neighbor_node]['color']
+            if neighbor_color != -1:
+                node_constraints[n].add(neighbor_color)
+    node_att = {k: {'forbidden_colors': v} for k, v in node_constraints.items()}
+    # extract sub graph
+    nx.set_node_attributes(graph, node_att)
+    subgraph = graph.subgraph(nodes=uncolored_nodes).copy()
+    return subgraph
+

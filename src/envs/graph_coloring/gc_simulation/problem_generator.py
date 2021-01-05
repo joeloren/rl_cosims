@@ -35,7 +35,7 @@ class FixedGraphGenerator(ScenarioGenerator):
         """
         self.nodes_id = nodes_ids
         self.edge_indexes = edge_indexes
-        self.edge_indexes.append((j, i) for i, j in self.edge_indexes)
+        self.edge_indexes += [(j, i) for i, j in self.edge_indexes]
         self.graph = nx.DiGraph()
         self.graph.add_nodes_from(self.nodes_id, color=-1, start_time=0)
         self.graph.add_edges_from(self.edge_indexes)
