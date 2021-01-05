@@ -101,5 +101,7 @@ def create_subproblem_from_partial_solution(graph: nx.Graph):
     # extract sub graph
     nx.set_node_attributes(graph, node_att)
     subgraph = graph.subgraph(nodes=uncolored_nodes).copy()
+    new_labels = {n: i for i, n in enumerate(uncolored_nodes)}
+    subgraph = nx.relabel_nodes(subgraph, new_labels)
     return subgraph
 

@@ -9,7 +9,7 @@ from src.envs.graph_coloring.gc_utils.graph_utils import (create_graph_from_obse
 from src.envs.graph_coloring.gc_utils.plot_results import plot_gc_solution
 
 from matplotlib import pyplot as plt
-
+import networkx as nx
 
 def test_fixed_problem():
     # test if reset works
@@ -264,5 +264,12 @@ def test_repair_preperation():
     new_graph.nodes[1]['color'] = -1
     new_graph.nodes[9]['color'] = -1
     subproblem_graph = create_subproblem_from_partial_solution(new_graph)
+    # TODO : create new problem generator from a subgraph that knows to get also the forbidden colors and
+    #  maximum possible colors
 
+    # check if the observation function works properly -
+    sub_nodes = list(subproblem_graph.nodes())
+    sub_edges = list(subproblem_graph.edges())
+    env = create_fixed_static_problem(nodes_ids=sub_nodes, edge_indexes=sub_edges)
+    obs = env.reset()
     print('hi')

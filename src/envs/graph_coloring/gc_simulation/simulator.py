@@ -63,10 +63,13 @@ class Simulator(Env):
         # used_color_ids: set - this is a bool vector if color is used or not
         # (0 - not used, 1 - used at least once in the graph)
         # nodes_start_time: np.array [n_nodes, 1] - start time for each node
+        # forbidden_colors: a matrix of size [n_colors, n_max_nodes] where the Matrix[n, c] is 1 if color c is
+        # forbidden for node n
         # color_adjacency_matrix: np.array [n_nodes, n_nodes] - this is an array where A[i, j] = -inf if there is no
         # edge between nodes i and j, and A[i, j] = node j color otherwise
         obs_spaces = {
             "nodes_id": spaces.Box(low=0, high=self.num_max_nodes, shape=(self.num_max_nodes,), dtype=np.int32),
+            "forbidden_colors": spaces.MultiBinary(n=[self.num_max_nodes, self.num_max_nodes]),
             "edge_indexes": spaces.Box(low=0, high=self.num_max_nodes, shape=(self.num_max_nodes, 2), dtype=np.int32),
             "current_time": spaces.Box(low=0, high=np.finfo(np.float32).max, shape=(1,), dtype=np.float32),
             "nodes_color": spaces.Box(low=-1, high=self.num_max_nodes, shape=(self.num_max_nodes,), dtype=np.int32),
@@ -157,10 +160,16 @@ class Simulator(Env):
         start_times = nx.get_node_attributes(self.current_state.graph, 'start_time')
         node_colors = np.array([colors[i] for i in nodes_id])
         node_start_times = np.array([start_times[i] for i in nodes_id])
+        forbidden_colors = np.zeros(shape=(np.max(nodes_id)+1, np.max(nodes_id)+1), dtype=np.bool)
+        for n in nodes_id:
+            if 'forbidden_colors' in self.current_state.graph.nodes()[n].keys():
+                for c in self.current_state.graph.nodes()[n]['forbidden_colors']:
+                    forbidden_colors[n, c] = True
         obs = {
             'node_colors': node_colors,
             'used_colors': deepcopy(self.current_state.unique_colors),
             'nodes_id': nodes_id,
+            'forbidden_colors': forbidden_colors,
             'edge_indexes': list(self.current_state.graph.edges),
             'current_time': self.current_time,
             'nodes_start_time': node_start_times,
