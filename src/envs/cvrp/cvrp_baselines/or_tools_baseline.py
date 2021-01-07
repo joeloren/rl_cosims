@@ -6,10 +6,12 @@ from matplotlib import pyplot as plt
 from ortools.constraint_solver import pywrapcp
 from scipy import stats
 # our imports
+from typing import Dict
+
 from src.envs.cvrp.cvrp_baselines import simple_baseline
 from src.envs.cvrp.cvrp_utils.plot_results import plot_vehicle_routes
 from src.envs.cvrp.cvrp_simulation.scenario_generator import (FixedSample, SampleStaticBenchmark)
-from src.envs.cvrp.cvrp_simulation.simulator_all_customers_in_obs import CVRPSimulation
+from src.envs.cvrp.cvrp_simulation.multiple_vehicle_cvrp import CVRPSimulation
 
 
 def create_data_model(obs, env, precision=1000):
@@ -166,20 +168,17 @@ class ORToolsPolicy:
         self.data = None
         self.next = None
 
-    def __call__(self, obs, env):
-        if len(obs["action_mask"]) == 2:
-            probs = np.zeros_like(obs["action_mask"])
+    def __call__(self, obs: Dict, env: CVRPSimulation) -> np.ndarray:
+
+        if np.all(obs["illegal_actions"][:, :-2] == True):
             # there are no customers opened in problem therefore the algorithm chooses the noop
             # option
             # if noop is disabled chooses the depot
-            if obs["action_mask"][-1]:
-                probs[-1] = 1
-            else:
-                probs[-2] = 1
+            probs = np.logical_not(obs["illegal_actions"])/ np.sum(np.logical_not(obs["illegal_actions"]))
             return probs
         elif (
             self.assignment is None
-            or (obs["current_vehicle_position"] == obs["depot_position"]).all()
+            or np.all(obs["current_vehicle_positions"] == obs["depot_position"])
         ):
             # only recompute the route if we are at the depot. Conceptually, we could recompute
             # it at every time step.
@@ -296,25 +295,27 @@ if __name__ == "__main__":
             customer_demands_rv=customer_demands_rv,
             vrp_size=vrp_size,
             start_at_depot=True,
+            num_vehicles=2
         )
     else:
         # run fixed problem for debugging
         customer_positions = np.array([[1, 0], [1, 1], [0, 1]])
         depot_position = np.array([0, 0])
-        initial_vehicle_position = np.array([0, 0])
-        initial_vehicle_capacity = 10
+        initial_vehicle_positions = np.array([[0, 0], [0, 0]])
+        initial_vehicle_capacities = np.array([[10], [10]])
         vehicle_velocity = 10
         customer_demands = np.array([5, 5, 5])
         customer_times = np.array([0, 0, 0])
         vrp_size = 3
         problem_generator = FixedSample(
-            depot_position,
-            initial_vehicle_position,
-            initial_vehicle_capacity,
-            vehicle_velocity,
-            customer_positions,
-            customer_demands,
-            customer_times,
+            depot_position=depot_position,
+            vehicle_positions=initial_vehicle_positions,
+            vehicle_capacities=initial_vehicle_capacities,
+            vehicle_velocity=vehicle_velocity,
+            customer_positions=customer_positions,
+            customer_demands=customer_demands,
+            customer_times=customer_times,
+            num_vehicles=2
         )
 
     sim = CVRPSimulation(max_customers=vrp_size, problem_generator=problem_generator)
