@@ -1,8 +1,9 @@
 import numpy as np
 import pytest
 
-from src.envs.cvrp.cvrp_experimentation.problems import create_fixed_static_problem
+from src.envs.cvrp.cvrp_experimentation.problems import create_fixed_static_problem, create_uniform_dynamic_problem
 from src.envs.cvrp.cvrp_simulation.multiple_vehicle_cvrp import CUSTOMER_STATUS, VEHICLE_STATUS
+from src.envs.cvrp.cvrp_baselines.simple_baseline import random_policy, distance_proportional_policy, action_selector
 
 
 def test_fixed_problem_one_vehicle_simple_problem():
@@ -43,7 +44,7 @@ def test_fixed_problem_one_vehicle_simple_problem():
     # make sure customer 1 is still in state waiting"
     assert sim.current_state.customer_status[1] == CUSTOMER_STATUS['opened']
     # make sure reward is the distance passed between vehicle position and customer 0
-    assert reward == 5
+    assert reward == -5
     # make sure choosing customer 0 is not legal any more
     assert obs['illegal_actions'][0, 0] == 1
     # make sure vehicle capacity is now 10
@@ -93,7 +94,7 @@ def test_fixed_problem_one_vehicle_return_to_depot():
     # make sure time is now ~7
     assert sim.env.now == 10
     # make sure reward is the distance between customer 0 and depot
-    assert reward == 5
+    assert reward == -5
     # make sure total distance vehicle 0 passed is depot -> customer 0 -> depot
     assert sim.current_state.vehicle_full_distance[0] == 10
     assert sim.current_state.vehicle_full_path[0] == [0, -1]
@@ -165,7 +166,7 @@ def test_fixed_problem_two_vehicle():
     # make sure vehicle 0 reached customer 0
     assert np.all(obs['current_vehicle_positions'][0, :] == obs["customer_positions"][0, :])
     # make sure reward is the full distance vehicles passed (both vehicles moved 5 m since both have same velocity)
-    assert reward == 10
+    assert reward == -10
     # choose customer 2 with vehicle 0
     obs, reward, is_done, info = sim.step((0, 2))
     # make sure simulation returns that it is done
@@ -254,3 +255,103 @@ def test_fixed_problem_two_vehicle_online_customers():
     assert sim.current_state.customer_status[2] == CUSTOMER_STATUS["opened"]
     # make sure vehicle 0 is available
     assert sim.current_state.vehicle_status[0] == VEHICLE_STATUS['available']
+
+
+def test_random_policy():
+    customer_positions = [[0., 5.], [10., 10.], [5., 5.]]
+    customer_demands = [10, 10, 10]
+    customer_times = [0, 0, 2]
+    vehicle_capacities = [[20], [20]]
+    vehicle_positions = [[0., 0.], [0., 0.]]
+    depot_position = [0., 0.]
+    seed = 0
+    sim = create_fixed_static_problem(customer_positions=customer_positions,
+                                      customer_demands=customer_demands,
+                                      customer_times=customer_times,
+                                      initial_vehicle_capacities=vehicle_capacities,
+                                      initial_vehicle_positions=vehicle_positions,
+                                      depot_position=depot_position, vehicle_velocity=1)
+    sim.seed(seed)
+    obs = sim.reset()
+    is_done = False
+    while not is_done:
+        action = action_selector(obs, sim, random_policy)
+        num_customers = obs['customer_positions'].shape[0]
+        obs, reward, is_done, info = sim.step(action)
+    assert np.all(obs["customer_status"] == CUSTOMER_STATUS['visited'])
+
+
+def test_distance_proportional_policy():
+    """
+    this tests the distance proportional policy and includes the following tasks:
+    1. 2 customers and 2 vehicles available at the same time
+    2. 1 vehicle available with no capacity (must return to depot)
+    3. 1 customer available for 1 vehicle
+    :return:
+    """
+    customer_positions = [[0., 5.], [10., 10.], [5., 5.]]
+    customer_demands = [10, 10, 10]
+    customer_times = [0, 0, 2]
+    vehicle_capacities = [[10], [10]]
+    vehicle_positions = [[0., 0.], [0., 0.]]
+    depot_position = [0., 0.]
+    seed = 0
+    sim = create_fixed_static_problem(customer_positions=customer_positions,
+                                      customer_demands=customer_demands,
+                                      customer_times=customer_times,
+                                      initial_vehicle_capacities=vehicle_capacities,
+                                      initial_vehicle_positions=vehicle_positions,
+                                      depot_position=depot_position, vehicle_velocity=1)
+    sim.seed(seed)
+    obs = sim.reset()
+    is_done = False
+    while not is_done:
+        action = action_selector(obs, sim, distance_proportional_policy)
+        num_customers = obs['customer_positions'].shape[0]
+        obs, reward, is_done, info = sim.step(action)
+    assert np.all(obs["customer_status"] == CUSTOMER_STATUS['visited'])
+
+
+def test_uniform_problem():
+    # test online uniform problem with distance proportional policy
+    sim = create_uniform_dynamic_problem(max_customer_times=0, size=10, num_vehicles=2, vehicle_velocity=1,
+                                         vehicle_capacity=30, max_demand=10, random_seed=0, start_at_depot=True)
+    sim.seed(0)
+    obs = sim.reset()
+    is_done = False
+    full_reward_online = 0
+    while not is_done:
+        action = action_selector(obs, sim, distance_proportional_policy)
+        obs, reward, is_done, info = sim.step(action)
+        full_reward_online += reward
+    # test same problem as offline uniform problem
+    sim.seed(0)
+    obs = sim.reset()
+    sim.initial_state.customer_times = np.zeros_like(sim.initial_state.customer_times)
+    sim.current_state.customer_times = np.zeros_like(sim.current_state.customer_times)
+    obs = sim.current_state_to_observation()
+    is_done = False
+    full_reward_offline = 0
+    while not is_done:
+        action = action_selector(obs, sim, distance_proportional_policy)
+        obs, reward, is_done, info = sim.step(action)
+        full_reward_offline += reward
+    # make sure full reward for offline problem is lower than online problem:
+    assert full_reward_online < full_reward_offline
+
+
+def test_uniform_problem_many_vehicles():
+    # test online uniform problem with distance proportional policy and many vehicles
+    sim = create_uniform_dynamic_problem(max_customer_times=0, size=100, num_vehicles=4, vehicle_velocity=1,
+                                         vehicle_capacity=30, max_demand=10, random_seed=0, start_at_depot=True)
+    sim.seed(0)
+    obs = sim.reset()
+    is_done = False
+    full_reward_online = 0
+    while not is_done:
+        action = action_selector(obs, sim, distance_proportional_policy)
+        obs, reward, is_done, info = sim.step(action)
+        full_reward_online += reward
+    # make sure full reward at the end is equal to the total travel distance
+    assert full_reward_online == -np.sum(sim.current_state.vehicle_full_distance)
+    print(f"final reward:{full_reward_online}")

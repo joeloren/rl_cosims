@@ -132,8 +132,6 @@ class CVRPSimulation(Env, ABC):
         obs = self.current_state_to_observation()
         return obs
 
-
-
     def step(self, action: Tuple):
         self.current_state.previous_time = self.env.now
         vehicle_index = action[0]
@@ -155,8 +153,9 @@ class CVRPSimulation(Env, ABC):
         travel_completion.callbacks.append(self.notify_customer_reached)
 
         self.run_to_decision_point()
-        reward = np.sum(self.current_state.vehicle_full_distance) - self.previous_reward
-        self.previous_reward = reward
+        current_full_reward = -np.sum(self.current_state.vehicle_full_distance)
+        reward = current_full_reward - self.previous_reward
+        self.previous_reward = current_full_reward
         is_done = self.is_done()
         obs = self.current_state_to_observation()
         return obs, reward, is_done, {}
@@ -189,13 +188,13 @@ class CVRPSimulation(Env, ABC):
                              f"vehicle -> index:{vehicle_index}, current customer:{current_vehicle_customer},"
                              f"status:{self.current_state.vehicle_status[vehicle_index]}\n"
                              f"customer -> index:{customer_index}")
-        if self.current_state.customer_status[customer_index] != CUSTOMER_STATUS['opened']:
-            raise ValueError(f"time:{self.env.now}, trying to chose a customer which is not opened.\n "
-                             f"vehicle -> index:{vehicle_index}, current customer:{current_vehicle_customer},"
-                             f"status:{self.current_state.vehicle_status[vehicle_index]}\n"
-                             f"customer -> index:{customer_index}, "
-                             f"status:{self.current_state.customer_status[customer_index]}")
         if customer_index != self.DEPOT_INDEX:
+            if self.current_state.customer_status[customer_index] != CUSTOMER_STATUS['opened']:
+                raise ValueError(f"time:{self.env.now}, trying to chose a customer which is not opened.\n "
+                                 f"vehicle -> index:{vehicle_index}, current customer:{current_vehicle_customer},"
+                                 f"status:{self.current_state.vehicle_status[vehicle_index]}\n"
+                                 f"customer -> index:{customer_index}, "
+                                 f"status:{self.current_state.customer_status[customer_index]}")
             # make sure vehicle capacity is larger than customer demand
             current_capacity = self.current_state.current_vehicle_capacities[vehicle_index]
             customer_demand = self.current_state.customer_demands[customer_index]
@@ -355,7 +354,7 @@ class CVRPSimulation(Env, ABC):
         :return: illegal_actions np.ndarray of size [num_vehicles, num_customers + 2]
         """
         num_customers = self.current_state.customer_positions.shape[0]
-        illegal_actions = np.ones(shape=[self.num_vehicles, num_customers + 2])
+        illegal_actions = np.ones(shape=[self.num_vehicles, num_customers + 2]).astype(np.bool)
         available_vehicles = np.where(self.current_state.vehicle_status == VEHICLE_STATUS['available'])[0]
         opened_customers = np.where(self.current_state.customer_status == CUSTOMER_STATUS['opened'])[0]
         for i_v in available_vehicles:

@@ -1,43 +1,60 @@
 import numpy as np
+from typing import Dict
 from matplotlib import pyplot as plt
 from scipy import stats
+from scipy.spatial.distance import cdist
 # our imports
 from src.envs.cvrp.cvrp_utils.plot_results import plot_vehicle_routes
 from src.envs.cvrp.cvrp_simulation.scenario_generator import FixedSample, SampleStaticBenchmark
-from src.envs.cvrp.cvrp_simulation.simulator import CVRPSimulation
+from src.envs.cvrp.cvrp_simulation.multiple_vehicle_cvrp import CVRPSimulation, DEPOT_INDEX
 
 
-def random_policy(obs, env):
-    probs = obs["action_mask"]
+def random_policy(obs: Dict, env: CVRPSimulation) -> np.ndarray:
+    """
+    this function returns a matrix of probabilities for choosing a random action.
+    it creates a uniform distribution between all possible actions (an action is a tuple of vehicle and customer)
+    :param obs:
+    :param env:
+    :return:
+    """
+    # illegal_actions is True if action is illegal, so need to take the not of this matrix
+    probs = np.logical_not(obs["illegal_actions"])
     return probs / np.sum(probs)
 
 
 def action_selector(obs, env, policy):
     action_probs = policy(obs, env)
-    act = np.random.choice(len(obs["action_mask"]), p=action_probs)
-    return act
+    # choose action based on action probs assuming all actions are part of the same distribution
+    act_gen_axis = np.random.choice(action_probs.size, p=action_probs.reshape(-1))
+    vehicle_chosen, customer_chosen = divmod(act_gen_axis, action_probs.shape[1])
+    num_customers = obs['customer_positions'].shape[0]
+    if customer_chosen == num_customers:
+        # in this case the depot was chosen, the simulation expects to get the depot as customer index -1
+        customer_chosen = DEPOT_INDEX
+    action = (vehicle_chosen, customer_chosen)
+    return action
 
 
-def distance_proportional_policy(obs, env):
+def distance_proportional_policy(obs: Dict, env: CVRPSimulation) -> np.ndarray:
     """
-    this function creates a greedy policy for the vehicle.
+    this function creates a greedy policy for the vehicles without noop option
     the probability is the inverse distance between the available customers and vehicle
     notes:
-    1. if there are no available customers the depot receives prob=1 and all other opened
+    1. if there are no available customers the depot receives prob=1/num_vehicles and all other opened
     customers are prob=0
-    2. if there is only one available customer it receives prob=1 and all other receive prob=0
+    2. if there is only one available customer it receives prob=1/num_vehicles for all available vehicles
+     and all other receive prob=0
     """
-    prob_out = np.zeros_like(obs["action_mask"]).astype(np.float)
-    vehicle_position = obs["current_vehicle_position"]
+    prob_out = np.zeros_like(obs["illegal_actions"]).astype(np.float)
+    vehicle_positions = obs["current_vehicle_positions"]
+    num_vehicles = vehicle_positions.shape[0]
     customer_positions = obs["customer_positions"]
-    if np.sum(obs["action_mask"][:-2]) == 0:
-        # in this case there are no customers available so returning to depot
-        prob_out[-2] = 1
+    if np.all(obs["illegal_actions"][:, :-2] == True):
+        # in this case there are no customers available so choosing randomly from feasible actions
+        prob_out = np.logical_not(obs['illegal_actions']) / np.sum(np.logical_not(obs['illegal_actions']))
     else:
-        distance_matrix = np.linalg.norm(
-            vehicle_position - customer_positions, axis=1
-        ).reshape(-1)
-        distance_matrix[np.logical_not(obs["action_mask"][:-2])] = 0
+        distance_matrix = cdist(vehicle_positions, customer_positions, metric="euclidean")
+        distance_matrix[obs["illegal_actions"][:, :-2]] = 0
         if distance_matrix[distance_matrix > 0].size > 1:
             # this is needed so that the customers closest to the vehicle receive the highest
             # probability
@@ -45,8 +62,8 @@ def distance_proportional_policy(obs, env):
         else:
             # if there is only one customer available there is no need to inverse its distance
             inverse_distance_matrix = distance_matrix
-        inverse_distance_matrix[np.logical_not(obs["action_mask"][:-2])] = 0
-        prob_out[:-2] = inverse_distance_matrix / np.sum(inverse_distance_matrix)
+        inverse_distance_matrix[obs["illegal_actions"][:, :-2]] = 0
+        prob_out[:, :-2] = inverse_distance_matrix / np.sum(inverse_distance_matrix)
     return prob_out
 
 
