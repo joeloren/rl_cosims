@@ -17,13 +17,16 @@ class State:
     # each node in the graph has :
     #   - color : the color of the node (default is -1)
     #   - open_time: time when node starts to be visible (in offline problem all start_time is 0)
+    #   - forbidden_colors: a set of forbidden colors for this node
     # each edge has a weight (assuming for now all edges have the same weight)
     num_colored_nodes: int  # number of colored nodes so far
     nodes_order: List  # list of the order the nodes were chosen
     current_time: int  # the current simulation time
     # this is an adjacency matrix where A[i, j] = -9999 if nodes (i, j) are not adjacent,
     # otherwise A[i, j] = color of node j (we will use this to check all of i's neighbors and see what their colors are)
-    colors_adjacency_matrix: np.array
+    colors_adjacency_matrix: np.ndarray
+    forbidden_colors: np.ndarray  # this is a matrix of forbidden colors in the problem. this is generated when we start
+    # the problem as sub-problem of a larger problem and then there are additional constraints
 
 
 class Simulator(Env):
@@ -46,7 +49,8 @@ class Simulator(Env):
         super().__init__()
         # initial state is empty data variables if self.reset() is not called
         self.initial_state: State = State(unique_colors=set(), graph=nx.Graph(), num_colored_nodes=0,
-                                          nodes_order=[], current_time=0, colors_adjacency_matrix=np.array([[]]))
+                                          nodes_order=[], current_time=0, colors_adjacency_matrix=np.array([[]]),
+                                          forbidden_colors=np.array([[]]))
         # current state of the simulation, this is updated at every step() call
         self.current_state: State = deepcopy(self.initial_state)
         self.problem_generator = problem_generator  # during reset this will generate a new instance of state
@@ -160,11 +164,7 @@ class Simulator(Env):
         start_times = nx.get_node_attributes(self.current_state.graph, 'start_time')
         node_colors = np.array([colors[i] for i in nodes_id])
         node_start_times = np.array([start_times[i] for i in nodes_id])
-        forbidden_colors = np.zeros(shape=(np.max(nodes_id)+1, np.max(nodes_id)+1), dtype=np.bool)
-        for n in nodes_id:
-            if 'forbidden_colors' in self.current_state.graph.nodes()[n].keys():
-                for c in self.current_state.graph.nodes()[n]['forbidden_colors']:
-                    forbidden_colors[n, c] = True
+        forbidden_colors = self.current_state.forbidden_colors.copy()
         obs = {
             'node_colors': node_colors,
             'used_colors': deepcopy(self.current_state.unique_colors),
@@ -186,3 +186,5 @@ class Simulator(Env):
         """
         num_colors_used = len(self.current_state.unique_colors)
         return num_colors_used
+
+

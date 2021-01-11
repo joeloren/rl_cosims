@@ -27,11 +27,15 @@ class FixedGraphGenerator(ScenarioGenerator):
     """
     this class creates a problem generator that always returns the same initial graph
     """
-    def __init__(self, nodes_ids: List, edge_indexes: List, *kwargs):
+    def __init__(self, nodes_ids: List, edge_indexes: List, forbidden_colors: np.ndarray, *kwargs):
         """
-        initialize the class with the variables that create the graph
-        :param nodes_ids: nodes iid (this is used as the identifier for the node, each node has a unique id)
+        initialize the class with the variables that create the graph and adds forbidden_colors to observation if there
+        are any
+        :param nodes_ids: nodes id (this is used as the identifier for the node, each node has a unique id)
         :param edge_indexes: tuple (u, v) indicates an edge between node u and node v
+        :param forbidden_colors: matrix [n_nodes, n_nodes] where m[i, j] = 1 if color j is forbidden for node i
+        a larger problem where some colors have been used already)
+        this is needed for "repair" method to solve a subgraph of an original problem
         """
         self.nodes_id = nodes_ids
         self.edge_indexes = edge_indexes
@@ -40,7 +44,17 @@ class FixedGraphGenerator(ScenarioGenerator):
         self.graph.add_nodes_from(self.nodes_id, color=-1, start_time=0)
         self.graph.add_edges_from(self.edge_indexes)
         pos = nx.spring_layout(self.graph)
-        att = {i: {'pos': p} for i, p in pos.items()}
+        att = {}
+        for i, p in pos.items():
+            if forbidden_colors is not None:
+                forbidden_colors_for_node = set(np.where(forbidden_colors[i, :])[0])
+            else:
+                forbidden_colors_for_node = set()
+            att[i] = {'color': -1,
+                      'start_time': 0,
+                      'pos': p,
+                      'forbidden_colors': forbidden_colors_for_node
+                      }
         nx.set_node_attributes(self.graph, att)
         # add nodes to graph with the features:
         #   - color : the color of the node (default is -1)
@@ -49,6 +63,7 @@ class FixedGraphGenerator(ScenarioGenerator):
         adjacency_matrix = nx.linalg.graphmatrix.adjacency_matrix(self.graph).toarray()
         adjacency_matrix[adjacency_matrix == 0] = -9999
         self.adjacency_matrix = adjacency_matrix
+        self.forbidden_colors = forbidden_colors
 
     def seed(self, seed: int) -> None:
         pass
@@ -69,7 +84,8 @@ class FixedGraphGenerator(ScenarioGenerator):
                       num_colored_nodes=0,
                       nodes_order=[],
                       current_time=0,
-                      colors_adjacency_matrix=deepcopy(self.adjacency_matrix))
+                      colors_adjacency_matrix=deepcopy(self.adjacency_matrix),
+                      forbidden_colors=self.forbidden_colors)
         return state
 
 
@@ -112,7 +128,7 @@ class ERGraphGenerator(ScenarioGenerator):
     def next(self, current_state: State):
         """
         this function returns the current state with the updated graph
-        :param current_state: the current cvrp state with the current graph and other important details
+        :param current_state: the current simulation state with the current graph and other important details
         :return: updated current state with new graph (added nodes and edges)
         """
         if self.is_online:
@@ -121,19 +137,22 @@ class ERGraphGenerator(ScenarioGenerator):
             current_state.graph.add_node(num_node_to_add, color=-1, start_time=current_state.current_time,
                                          pos=np.array([np.random.uniform(-1, 1, 1), np.random.uniform(-1, 1, 1)]))
             # go over all other nodes and graph and see if edge needs to be added
-            new_adjacency_row = np.zeros(shape=num_node_to_add) - 9999
-            new_adjacency_column = np.zeros(shape=num_node_to_add) - 9999
+            new_adjacency_row = np.zeros(shape=num_node_to_add+1) - 9999
+            new_adjacency_column = np.zeros(shape=num_node_to_add+1) - 9999
             for n in current_state.graph.nodes():
-                if np.random.random() > self.prob_edge:
-                    current_state.graph.add_edge(num_node_to_add, n)
-                    current_state.graph.add_edge(n, num_node_to_add)  # add edge in other direction
-                    # add color_adjacency_matrix value to the last row of the matrix
-                    new_adjacency_row[n] = current_state.graph.nodes('color')[n]
-            new_color_adjacency_matrix = np.zeros(shape=(num_node_to_add, num_node_to_add))
+                if n != num_node_to_add:
+                    if np.random.random() > self.prob_edge:
+                        current_state.graph.add_edge(num_node_to_add, n)
+                        current_state.graph.add_edge(n, num_node_to_add)  # add edge in other direction
+                        # add color_adjacency_matrix value to the last row of the matrix
+                        new_adjacency_row[n] = current_state.graph.nodes('color')[n]
+            new_color_adjacency_matrix = np.zeros(shape=(num_node_to_add+1, num_node_to_add+1))
             new_color_adjacency_matrix[:-1, :-1] = current_state.colors_adjacency_matrix
             new_color_adjacency_matrix[-1, :] = new_adjacency_row
             new_color_adjacency_matrix[:, -1] = new_adjacency_column
             current_state.colors_adjacency_matrix = new_color_adjacency_matrix
+            forbidden_colors = np.zeros(shape=(num_node_to_add+1, num_node_to_add+1), dtype=np.bool)
+            current_state.forbidden_colors = forbidden_colors
         return current_state
 
     def reset(self) -> State:
@@ -141,10 +160,12 @@ class ERGraphGenerator(ScenarioGenerator):
         adjacency_matrix = nx.linalg.graphmatrix.adjacency_matrix(graph).toarray()
         adjacency_matrix[adjacency_matrix == 0] = -9999
         adjacency_matrix[adjacency_matrix == 1] = -1
+        forbidden_colors = np.zeros(shape=(self.num_initial_nodes, self.num_initial_nodes), dtype=np.bool)
         state = State(unique_colors=set(),
                       graph=graph,
                       num_colored_nodes=0,
                       nodes_order=[],
                       current_time=0,
-                      colors_adjacency_matrix=adjacency_matrix)
+                      colors_adjacency_matrix=adjacency_matrix,
+                      forbidden_colors=forbidden_colors)
         return state

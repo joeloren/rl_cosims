@@ -11,11 +11,13 @@ from src.envs.graph_coloring.gc_utils.plot_results import plot_gc_solution
 from matplotlib import pyplot as plt
 import networkx as nx
 
+
 def test_fixed_problem():
     # test if reset works
     nodes = [i for i in range(10)]
     edges = [(u, v) for u in range(5) for v in range(5, 10) if np.random.random() < 0.5]
-    env = create_fixed_static_problem(nodes_ids=nodes, edge_indexes=edges)
+    forbidden_colors = np.zeros(shape=(10, 10), dtype=np.bool)
+    env = create_fixed_static_problem(nodes_ids=nodes, edge_indexes=edges, forbidden_colors=forbidden_colors)
     # make sure that before reset there are no nodes
     assert len(env.initial_state.graph.nodes) == 0
     # make sure that before reset there are no edges
@@ -83,17 +85,18 @@ def test_random_online_er_problem():
     assert len(env.current_state.graph.nodes()) == num_initial_nodes + num_new_nodes
 
 
-def test_illegal_action():
+def test_reward_function():
     # test if reset works
     nodes = [i for i in range(10)]
     edges = [(u, v) for u in range(5) for v in range(5, 10) if np.random.random() < 0.5]
-    env = create_fixed_static_problem(nodes_ids=nodes, edge_indexes=edges)
+    forbidden_colors = np.zeros(shape=(10, 10), dtype=np.bool)
+    env = create_fixed_static_problem(nodes_ids=nodes, edge_indexes=edges, forbidden_colors=forbidden_colors)
     obs = env.reset()
     done = False
     action = (0, 0)  # chose the first node and colored it 0
     next_obs, reward, is_done, _ = env.step(action)
     # make sure now one color is used
-    assert reward == 1
+    assert reward == -1
     # make sure simulation is not done yet
     assert is_done is False
     # check if color 0 was added to observation
@@ -105,7 +108,8 @@ def test_random_policy_with_fixed_problem():
     # test if reset works
     nodes = [i for i in range(10)]
     edges = [(u, v) for u in range(5) for v in range(5, 10) if np.random.random() < 0.5]
-    env = create_fixed_static_problem(nodes_ids=nodes, edge_indexes=edges)
+    forbidden_colors = np.zeros(shape=(10, 10), dtype=np.bool)
+    env = create_fixed_static_problem(nodes_ids=nodes, edge_indexes=edges, forbidden_colors=forbidden_colors)
     obs = env.reset()
     done = False
     action = random_policy(obs, env)
@@ -114,6 +118,24 @@ def test_random_policy_with_fixed_problem():
     assert color_chosen == 0
     while not done:
         action = random_policy(obs, env)
+        next_obs, reward, done, _ = env.step(action)
+        obs = next_obs
+
+
+def test_random_policy_without_new_colors_with_fixed_problem():
+    # test if reset works
+    nodes = [i for i in range(10)]
+    edges = [(u, v) for u in range(5) for v in range(5, 10) if np.random.random() < 0.5]
+    forbidden_colors = np.zeros(shape=(10, 10), dtype=np.bool)
+    env = create_fixed_static_problem(nodes_ids=nodes, edge_indexes=edges, forbidden_colors=forbidden_colors)
+    obs = env.reset()
+    done = False
+    action = random_policy_without_newcolor(obs, env)
+    color_chosen = action[1]
+    # make sure that the first color chosen is 0
+    assert color_chosen == 0
+    while not done:
+        action = random_policy_without_newcolor(obs, env)
         next_obs, reward, done, _ = env.step(action)
         obs = next_obs
 
@@ -144,7 +166,8 @@ def test_ortools_policy_with_fixed_problem():
     # test if policy works
     nodes = [i for i in range(10)]
     edges = [(u, v) for u in range(5) for v in range(5, 10) if np.random.random() < 0.5]
-    env = create_fixed_static_problem(nodes_ids=nodes, edge_indexes=edges)
+    forbidden_colors = np.zeros(shape=(10, 10), dtype=np.bool)
+    env = create_fixed_static_problem(nodes_ids=nodes, edge_indexes=edges, forbidden_colors=forbidden_colors)
     obs = env.reset()
     or_tools_policy = ORToolsOfflinePolicy(verbose=True, timeout=100)
     action = or_tools_policy(obs, env)
@@ -245,12 +268,13 @@ def test_color_adjacency_matrix():
             assert set(node_color) not in set(neighbor_colors)
 
 
-def test_repair_preperation():
+def test_repair_preparation():
     # test if reset works
     np.random.seed(0)
     nodes = [i for i in range(10)]
     edges = [(u, v) for u in range(5) for v in range(5, 10) if np.random.random() < 0.5]
-    env = create_fixed_static_problem(nodes_ids=nodes, edge_indexes=edges)
+    forbidden_colors = np.zeros(shape=(10, 10), dtype=np.bool)
+    env = create_fixed_static_problem(nodes_ids=nodes, edge_indexes=edges, forbidden_colors=forbidden_colors)
 
     obs = env.reset()
     is_done = False
@@ -264,12 +288,17 @@ def test_repair_preperation():
     new_graph.nodes[1]['color'] = -1
     new_graph.nodes[9]['color'] = -1
     subproblem_graph = create_subproblem_from_partial_solution(new_graph)
-    # TODO : create new problem generator from a subgraph that knows to get also the forbidden colors and
-    #  maximum possible colors
-
     # check if the observation function works properly -
     sub_nodes = list(subproblem_graph.nodes())
     sub_edges = list(subproblem_graph.edges())
-    env = create_fixed_static_problem(nodes_ids=sub_nodes, edge_indexes=sub_edges)
-    obs = env.reset()
-    print('hi')
+    max_colors = np.max(list(obs['used_colors']))
+    forbidden_colors = np.zeros(shape=(len(sub_nodes), max_colors), dtype=np.bool)
+    for n in sub_nodes:
+        for c in subproblem_graph.nodes()[n]['forbidden_colors']:
+            forbidden_colors[n, c] = True
+    sub_env = create_fixed_static_problem(nodes_ids=sub_nodes, edge_indexes=sub_edges, forbidden_colors=forbidden_colors)
+    sub_obs = sub_env.reset()
+    is_done = False
+    while not is_done:
+        action = random_policy_without_newcolor(sub_obs, sub_env)
+        sub_obs = sub_env.step(action)

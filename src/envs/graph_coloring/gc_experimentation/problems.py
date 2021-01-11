@@ -1,19 +1,27 @@
 # basic imports
 from typing import List
-
+import numpy as np
 # mathematical imports
 # our imports
 from src.envs.graph_coloring.gc_simulation.problem_generator import FixedGraphGenerator, ERGraphGenerator
 from src.envs.graph_coloring.gc_simulation.simulator import Simulator
 
 
-def create_fixed_static_problem(nodes_ids: List, edge_indexes: List[tuple], random_seed=0) -> Simulator:
+def create_fixed_static_problem(nodes_ids: List, edge_indexes: List[tuple], forbidden_colors: np.ndarray,
+                                random_seed=0) -> Simulator:
     """
     Creates a minimal instance with fixed parameters
-    :return: cvrp with fixed problem generator
+    :param nodes_ids: the ids of the nodes in the graph
+    :param edge_indexes: a list of edges. each edge is a tuple (i, j) from node i to node j
+    :param forbidden_colors: a matrix of forbidden colors for each node (only used if the problem is created as a
+    sub-problem of a larger problem. m[i, j] = True if color j is forbidden for node i
+    :param random_seed: the random seed to be used (not relevant for this type of problems since the problem is static)
+    :return: simulation with fixed problem generator
     """
-    problem_generator = FixedGraphGenerator(nodes_ids=nodes_ids, edge_indexes=edge_indexes)
-    sim = Simulator(num_max_nodes=len(nodes_ids), problem_generator=problem_generator, max_time_steps=len(nodes_ids)+1)
+    problem_generator = FixedGraphGenerator(nodes_ids=nodes_ids, edge_indexes=edge_indexes,
+                                            forbidden_colors=forbidden_colors)
+    sim = Simulator(num_max_nodes=len(nodes_ids), problem_generator=problem_generator,
+                    max_time_steps=len(nodes_ids) + 1)
     sim.seed(random_seed)
     return sim
 

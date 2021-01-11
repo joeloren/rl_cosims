@@ -12,7 +12,8 @@ from src.envs.graph_coloring.gc_simulation.simulator import Simulator
 from src.envs.graph_coloring.gc_experimentation.problems import create_fixed_static_problem
 
 
-def solve_or_tools(nodes: List[int], edges: List[Tuple], max_num_colors: int, timeout: float = 40, verbose=False):
+def solve_or_tools(nodes: List[int], edges: List[Tuple], max_num_colors: int, forbidden_colors: np.ndarray = None,
+                   timeout: float = 40, verbose=False):
     """
     Given an undirected graph with no loops G = (V, E), where V is a set of
       nodes, E <= V x V is a set of arcs, the Graph Coloring Problem is to
@@ -26,6 +27,8 @@ def solve_or_tools(nodes: List[int], edges: List[Tuple], max_num_colors: int, ti
       http://www.hakank.org/google_or_tools/
     :param nodes: nx graph of problem
     :param edges:
+    :param forbidden_colors: matrix of forbidden colors. this is used only if we want a sub-problem solution where there
+    are additional constraints. m[i, j] = True if color j is forbidden for node i
     :param verbose: if True should print logs
     :param max_num_colors: maximum number of colors allowed in graph
     :param timeout: run time given to algorithm
@@ -52,6 +55,11 @@ def solve_or_tools(nodes: List[int], edges: List[Tuple], max_num_colors: int, ti
     for e in edges:
         for c in range(max_num_colors):
             solver.Add(x[e[0], c] + x[e[1], c] <= u[c])
+    if forbidden_colors is not None:
+        for n in range(forbidden_colors.shape[0]):
+            forbidden_colors_for_node = np.where(forbidden_colors[n, :])[0]
+            for c in forbidden_colors_for_node:
+                solver.Add(x[n, c] == 0)
     objective = solver.Minimize(obj)
     if verbose:
         print(f"objective is:{objective}")
@@ -122,7 +130,13 @@ class ORToolsOfflinePolicy:
             edges = obs["edge_indexes"]
             found_solution = False
             num_iters = 0
-            for i in range(np.min([len(nodes), 3]), len(nodes)+1):
+            if obs['forbidden_colors'] is None:
+                min_colors = np.min([len(nodes), 3])
+                max_colors = len(nodes)
+            else:
+                min_colors = np.min([obs['forbidden_colors'].shape[1], 3])
+                max_colors = np.max([len(nodes), obs['forbidden_colors'].shape[1]])
+            for i in range(min_colors, max_colors + 1):
                 max_num_colors = i
                 if self.verbose:
                     print(f"trying to solve or-tools with maximum colors:{i} , num nodes:{len(nodes)}")

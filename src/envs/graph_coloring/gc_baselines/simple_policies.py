@@ -21,7 +21,8 @@ def random_policy(obs, env: Simulator) -> Tuple:
     available_node_indexes = np.where(obs["node_colors"] == -1)[0]
     # chose node randomly using np.random choice
     node_chosen = np.random.choice(available_node_indexes, 1)[0]
-    unavailable_colors = set()
+    # get the forbidden colors for this node and add them to the list of unavailable colors :
+    unavailable_colors = set([i for i, c in enumerate(obs['forbidden_colors'][node_chosen, :]) if c])
     for nn in graph.neighbors(node_chosen):
         if obs["node_colors"][nn] != -1:
             unavailable_colors.add(obs["node_colors"][nn])
@@ -29,6 +30,9 @@ def random_policy(obs, env: Simulator) -> Tuple:
     available_colors = obs["used_colors"] - unavailable_colors
     # add new color option (new color is either the next number after the maximum color id already in graph or 0)
     new_color = np.max(list(obs["used_colors"])) + 1 if len(obs["used_colors"]) > 0 else 0
+    # need to check if the next color is in the list of un-available colors. this is possible if
+    while new_color in unavailable_colors:
+        new_color += 1
     available_colors.add(new_color)
     # choose color from list of available colors
     color_chosen = np.random.choice(list(available_colors), 1)[0]
@@ -50,7 +54,7 @@ def random_policy_without_newcolor(obs, env: Simulator) -> Tuple:
     available_node_indexes = np.where(obs["node_colors"] == -1)[0]
     # chose node randomly using np.random choice
     node_chosen = np.random.choice(available_node_indexes, 1)[0]
-    unavailable_colors = set()
+    unavailable_colors = set([i for i, c in enumerate(obs['forbidden_colors'][node_chosen, :]) if c])
     for nn in graph.neighbors(node_chosen):
         if obs["node_colors"][nn] != -1:
             unavailable_colors.add(obs["node_colors"][nn])
@@ -58,11 +62,10 @@ def random_policy_without_newcolor(obs, env: Simulator) -> Tuple:
     available_colors = obs["used_colors"] - unavailable_colors
     # add new color option (new color is either the next number after the maximum color id already in graph or 0)
     new_color = np.max(list(obs["used_colors"])) + 1 if len(obs["used_colors"]) > 0 else 0
+    while new_color in unavailable_colors:
+        new_color += 1
     if len(available_colors) == 0:
         available_colors.add(new_color)
     # choose color from list of available colors
     color_chosen = np.random.choice(list(available_colors), 1)[0]
     return node_chosen, color_chosen
-
-
-
