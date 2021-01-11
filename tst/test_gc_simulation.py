@@ -269,7 +269,7 @@ def test_color_adjacency_matrix():
 
 
 def test_repair_preparation():
-    # test if reset works
+    # test repair and destroy work. repair is done using random policy without new color
     np.random.seed(0)
     nodes = [i for i in range(10)]
     edges = [(u, v) for u in range(5) for v in range(5, 10) if np.random.random() < 0.5]
@@ -302,3 +302,39 @@ def test_repair_preparation():
     while not is_done:
         action = random_policy_without_newcolor(sub_obs, sub_env)
         sub_obs = sub_env.step(action)
+
+
+def test_subproblem_repair_with_or_tools():
+    # test repair and destroy work. repair is done using or tools
+    np.random.seed(0)
+    nodes = [i for i in range(10)]
+    edges = [(u, v) for u in range(5) for v in range(5, 10) if np.random.random() < 0.5]
+    forbidden_colors = np.zeros(shape=(10, 10), dtype=np.bool)
+    env = create_fixed_static_problem(nodes_ids=nodes, edge_indexes=edges, forbidden_colors=forbidden_colors)
+    obs = env.reset()
+    is_done = False
+    i = 0
+    while not is_done:
+        # color each node with a color matching it's id
+        obs, reward, is_done, _ = env.step((i, i))
+        print(f"current time is:{obs['current_time']}, num_nodes:{len(obs['node_colors'])}")
+        i += 1
+    new_graph = env.current_state.graph.copy()
+    new_graph.nodes[1]['color'] = -1
+    new_graph.nodes[9]['color'] = -1
+    subproblem_graph = create_subproblem_from_partial_solution(new_graph)
+    # check if the observation function works properly -
+    sub_nodes = list(subproblem_graph.nodes())
+    sub_edges = list(subproblem_graph.edges())
+    max_colors = np.max(list(obs['used_colors']))
+    forbidden_colors = np.zeros(shape=(len(sub_nodes), max_colors), dtype=np.bool)
+    for n in sub_nodes:
+        for c in subproblem_graph.nodes()[n]['forbidden_colors']:
+            forbidden_colors[n, c] = True
+    sub_env = create_fixed_static_problem(nodes_ids=sub_nodes, edge_indexes=sub_edges, forbidden_colors=forbidden_colors)
+    sub_obs = sub_env.reset()
+    is_done = False
+    or_tools_policy = ORToolsOfflinePolicy(verbose=True, timeout=100)
+    while not is_done:
+        action = or_tools_policy(sub_obs, sub_env)
+        sub_obs, sub_reward, is_done, _ = sub_env.step(action)

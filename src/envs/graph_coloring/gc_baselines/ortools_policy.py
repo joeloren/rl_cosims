@@ -40,7 +40,7 @@ def solve_or_tools(nodes: List[int], edges: List[Tuple], max_num_colors: int, fo
     # x[i,c] = 1 means that node i is assigned color c
     x = {}
     for n in nodes:
-        for c in range(max_num_colors):
+        for c in range(max_num_colors+1):
             x[n, c] = solver.IntVar(0, 1, 'v[%i,%i]' % (n, c))
     # u[c] = 1 means that color c is used, i.e. assigned to some node
     u = [solver.IntVar(0, 1, 'u[%i]' % i) for i in range(max_num_colors)]
@@ -125,23 +125,29 @@ class ORToolsOfflinePolicy:
         :return: (node_chosen, color_chosen)
         """
         # if current time is 0, run problem and save results -
+        forbidden_colors = obs['forbidden_colors']
         if obs['current_time'] == 0:
             nodes = list(obs["nodes_id"])
             edges = obs["edge_indexes"]
             found_solution = False
             num_iters = 0
-            if obs['forbidden_colors'] is None:
+            if forbidden_colors is None:
                 min_colors = np.min([len(nodes), 3])
                 max_colors = len(nodes)
             else:
-                min_colors = np.min([obs['forbidden_colors'].shape[1], 3])
-                max_colors = np.max([len(nodes), obs['forbidden_colors'].shape[1]])
+                # find what the maximum color index is in forbidden colors. in this matrix the colors are the columns
+                # therefore np.where(forbidden_colors)[1] returns the columns that are True.
+                # the maximum value here is the maximum color used
+                num_forbidden_colors = np.max(np.where(forbidden_colors)[1])
+                min_colors = np.max([num_forbidden_colors, 3])
+                max_colors = np.max([len(nodes), num_forbidden_colors])
             for i in range(min_colors, max_colors + 1):
                 max_num_colors = i
                 if self.verbose:
                     print(f"trying to solve or-tools with maximum colors:{i} , num nodes:{len(nodes)}")
                 node_colors, graph, found_solution = solve_or_tools(nodes, edges, max_num_colors,
-                                                                    timeout=self.timeout, verbose=self.verbose)
+                                                                    timeout=self.timeout, verbose=self.verbose,
+                                                                    forbidden_colors=forbidden_colors)
                 if found_solution:
                     self.graph = graph
                     self.node_colors = node_colors
@@ -162,9 +168,10 @@ class ORToolsOfflinePolicy:
         if obs["node_colors"][node_chosen] != -1:
             raise ValueError(f"current time:{obs['current_time']}, "
                              f"node_chosen :{node_chosen}, already has a color:{obs['node_colors'][node_chosen]}")
-        if color_chosen != 0 and color_chosen > max(obs["used_colors"]) + 1:
-            raise ValueError(f"chose a color out of order. chosen color:{color_chosen}. "
-                             f"colors used so far:{obs['used_colors']}.")
+        if forbidden_colors is None:
+            if color_chosen != 0 and color_chosen > max(obs["used_colors"]) + 1:
+                raise ValueError(f"chose a color out of order. chosen color:{color_chosen}. "
+                                 f"colors used so far:{obs['used_colors']}.")
         return node_chosen, color_chosen
 
 
@@ -194,7 +201,8 @@ def main():
     node_colors, graph, found_solution = solve_or_tools(nodes=nodes, edges=edges,
                                                         max_num_colors=max_num_colors, timeout=2000)
     or_tools_policy = ORToolsOfflinePolicy(verbose=True, timeout=1000)
-    env = create_fixed_static_problem(nodes, edges, random_seed=0)
+    forbidden_colors = np.zeros(shape=(20, 20), dtype=np.bool)
+    env = create_fixed_static_problem(nodes, edges, random_seed=0, forbidden_colors=forbidden_colors)
     obs = env.reset()
     done = False
     while not done:
