@@ -138,7 +138,10 @@ class ORToolsOfflinePolicy:
                 # find what the maximum color index is in forbidden colors. in this matrix the colors are the columns
                 # therefore np.where(forbidden_colors)[1] returns the columns that are True.
                 # the maximum value here is the maximum color used
-                num_forbidden_colors = np.max(np.where(forbidden_colors)[1])
+                if len(np.where(forbidden_colors)[1]) > 0:
+                    num_forbidden_colors = np.max(np.where(forbidden_colors)[1])
+                else:
+                    num_forbidden_colors = 0
                 min_colors = np.max([num_forbidden_colors, 3])
                 max_colors = np.max([len(nodes), num_forbidden_colors])
             for i in range(min_colors, max_colors + 1):

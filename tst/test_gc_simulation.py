@@ -301,7 +301,7 @@ def test_repair_preparation():
     is_done = False
     while not is_done:
         action = random_policy_without_newcolor(sub_obs, sub_env)
-        sub_obs = sub_env.step(action)
+        sub_obs, reward, is_done, _ = sub_env.step(action)
 
 
 def test_subproblem_repair_with_or_tools():
